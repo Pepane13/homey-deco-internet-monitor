@@ -1,0 +1,68 @@
+{
+  "metric": {
+    "download": "Download",
+    "upload": "Upload",
+    "latency": "Latency",
+    "jitter": "Jitter",
+    "loss": "Packet loss"
+  },
+  "band": {
+    "band2_4": "2.4 GHz",
+    "band5": "5 GHz",
+    "band6": "6 GHz",
+    "wired": "Wired"
+  },
+  "status": {
+    "speedtest_running": "Speed test in progress…",
+    "unreachable": "Unreachable",
+    "auth": "Login refused: check the password",
+    "deco_owner": "Login refused: use the owner account password (manager accounts are not accepted)",
+    "unsupported": "This Deco firmware uses an older login protocol that is not supported yet"
+  },
+  "pair": {
+    "livebox_subtitle": "Local connection to the Livebox administration interface",
+    "deco_subtitle": "Local connection to the main Deco (the one connected to the box)",
+    "host": "IP address",
+    "livebox_host_hint": "Usually 192.168.1.1",
+    "deco_host_hint": "Shown in the Deco app: More > Advanced > IPv4 (\"LAN IP\")",
+    "password": "Password",
+    "livebox_password_hint": "Livebox administration password (by default the first 8 characters of the Wi-Fi key printed under the box)",
+    "deco_password_hint": "Password of the owner TP-Link ID. Each login closes the owner session in the Deco app: use a manager account in the app.",
+    "button": "Connect",
+    "connecting": "Connecting…",
+    "found": "Connected:",
+    "nodes": "Deco nodes found",
+    "add": "Add",
+    "main": "main",
+    "already": "already added",
+    "none_selected": "Select at least one Deco",
+    "box_title": "Internet box",
+    "box_subtitle": "Choose your Internet provider, then connect to your box on the local network",
+    "operator": "Internet provider",
+    "next": "Next",
+    "back": "Back",
+    "password_hint_orange": "Livebox administration password (by default the first 8 characters of the Wi-Fi key printed under the box)",
+    "password_hint_sosh": "Livebox administration password (by default the first 8 characters of the Wi-Fi key printed under the box)",
+    "password_hint_bouygues": "Optional: Bbox administration password, only needed if your box requires it. A wrong password locks the Bbox login for a few minutes.",
+    "password_hint_sfr": "Optional: SFR Box status is readable without a password. Fill it only if your box requires it."
+  },
+  "errors": {
+    "invalid_ip": "Enter a valid IP address, for example 192.168.1.1",
+    "password_required": "The password is required",
+    "unreachable": "Device unreachable:",
+    "auth": "Login refused, check the password.",
+    "deco_auth": "Login refused. Use the password of the owner TP-Link ID (manager accounts are not accepted by the Deco).",
+    "unsupported": "This Deco firmware uses an older login protocol that is not supported yet.",
+    "read_failed": "Reading failed:",
+    "no_session": "Connect first",
+    "operator_required": "Choose your Internet provider",
+    "auth_optional": "The box asks for its administration password: enter it and try again.",
+    "locked": "The box temporarily refuses logins after failed attempts: wait 15 minutes.",
+    "wrong_operator": "The answer does not match this provider: check the selected provider and the address."
+  },
+  "deco": {
+    "main": "Main Deco (connected to the box)",
+    "role_main": "Main (connected to the box)",
+    "role_satellite": "Satellite"
+  }
+}

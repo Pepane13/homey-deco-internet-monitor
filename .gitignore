@@ -1,0 +1,9 @@
+# Homey CLI build
+.homeybuild/
+node_modules/
+# Archives
+*.zip
+# Misc
+.DS_Store
+Thumbs.db
+desktop.ini

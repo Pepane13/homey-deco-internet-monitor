@@ -1,0 +1,2168 @@
+{
+  "id": "com.pepane13.netmonitor",
+  "version": "1.0.0",
+  "compatibility": ">=12.2.0",
+  "sdk": 3,
+  "platforms": [
+    "local"
+  ],
+  "name": {
+    "en": "Deco & Internet Monitor",
+    "fr": "Deco & Internet Monitor"
+  },
+  "description": {
+    "en": "Monitor your Internet connection, your box (Orange, Sosh, Bouygues, SFR) and Deco Wi-Fi locally",
+    "fr": "Surveillez votre connexion Internet, votre box (Orange, Sosh, Bouygues, SFR) et votre Wi-Fi Deco en local"
+  },
+  "category": [
+    "internet"
+  ],
+  "permissions": [],
+  "images": {
+    "small": "/assets/images/small.png",
+    "large": "/assets/images/large.png",
+    "xlarge": "/assets/images/xlarge.png"
+  },
+  "author": {
+    "name": "Stéphane Renaudet",
+    "email": "stephane.renaudet@gmail.com"
+  },
+  "brandColor": "#1B6EC2",
+  "tags": {
+    "en": [
+      "internet",
+      "network",
+      "speedtest",
+      "wifi",
+      "livebox",
+      "orange",
+      "sosh",
+      "bbox",
+      "bouygues",
+      "sfr",
+      "deco",
+      "tp-link",
+      "fibre",
+      "ping",
+      "latency",
+      "outage"
+    ],
+    "fr": [
+      "internet",
+      "réseau",
+      "test de débit",
+      "wifi",
+      "livebox",
+      "orange",
+      "sosh",
+      "bbox",
+      "bouygues",
+      "sfr",
+      "deco",
+      "tp-link",
+      "fibre",
+      "ping",
+      "latence",
+      "coupure"
+    ]
+  },
+  "source": "https://github.com/Pepane13/homey-deco-internet-monitor",
+  "bugs": {
+    "url": "https://github.com/Pepane13/homey-deco-internet-monitor/issues"
+  },
+  "support": "https://github.com/Pepane13/homey-deco-internet-monitor/issues",
+  "drivers": [
+    {
+      "id": "internet",
+      "name": {
+        "en": "Internet quality",
+        "fr": "Qualité Internet"
+      },
+      "class": "sensor",
+      "capabilities": [
+        "netmon_status",
+        "netmon_online",
+        "netmon_download",
+        "netmon_upload",
+        "netmon_latency",
+        "netmon_jitter",
+        "netmon_loss",
+        "netmon_latency.gateway",
+        "netmon_dns",
+        "netmon_latency.speedtest",
+        "netmon_outages",
+        "netmon_downtime"
+      ],
+      "capabilitiesOptions": {
+        "netmon_online": {
+          "title": {
+            "en": "Internet",
+            "fr": "Internet"
+          }
+        },
+        "netmon_latency": {
+          "title": {
+            "en": "Latency (Internet)",
+            "fr": "Latence (Internet)"
+          }
+        },
+        "netmon_latency.gateway": {
+          "title": {
+            "en": "Latency (box)",
+            "fr": "Latence (box)"
+          }
+        },
+        "netmon_latency.speedtest": {
+          "title": {
+            "en": "Latency (speed test)",
+            "fr": "Latence (test de débit)"
+          }
+        }
+      },
+      "platforms": [
+        "local"
+      ],
+      "connectivity": [
+        "lan"
+      ],
+      "images": {
+        "small": "/drivers/internet/assets/images/small.png",
+        "large": "/drivers/internet/assets/images/large.png",
+        "xlarge": "/drivers/internet/assets/images/xlarge.png"
+      },
+      "pair": [
+        {
+          "id": "list_devices",
+          "template": "list_devices",
+          "navigation": {
+            "next": "add_devices"
+          }
+        },
+        {
+          "id": "add_devices",
+          "template": "add_devices"
+        }
+      ],
+      "settings": [
+        {
+          "type": "group",
+          "label": {
+            "en": "Connectivity probes",
+            "fr": "Sondes de connectivité"
+          },
+          "children": [
+            {
+              "id": "probe_interval",
+              "type": "number",
+              "label": {
+                "en": "Probe interval",
+                "fr": "Intervalle des sondes"
+              },
+              "value": 30,
+              "min": 10,
+              "max": 600,
+              "units": {
+                "en": "s",
+                "fr": "s"
+              }
+            },
+            {
+              "id": "probe_targets",
+              "type": "text",
+              "label": {
+                "en": "Internet targets",
+                "fr": "Cibles Internet"
+              },
+              "value": "1.1.1.1:443, 8.8.8.8:443, 9.9.9.9:443",
+              "hint": {
+                "en": "Host:port list, separated by commas. Latency is the TCP handshake time (Homey apps cannot send ICMP pings). Internet is considered down only when every target fails.",
+                "fr": "Liste hôte:port séparée par des virgules. La latence est le temps de connexion TCP (une app Homey ne peut pas envoyer de ping ICMP). Internet est considéré coupé seulement si toutes les cibles échouent."
+              }
+            },
+            {
+              "id": "gateway",
+              "type": "text",
+              "label": {
+                "en": "Box address",
+                "fr": "Adresse de la box"
+              },
+              "value": "192.168.1.1:80",
+              "hint": {
+                "en": "Measures the local network latency up to the box, to tell a LAN problem from an Internet one. Leave empty to disable.",
+                "fr": "Mesure la latence du réseau local jusqu'à la box, pour distinguer un problème local d'un problème Internet. Laisser vide pour désactiver."
+              }
+            },
+            {
+              "id": "confirm_rounds",
+              "type": "number",
+              "label": {
+                "en": "Outage confirmation",
+                "fr": "Confirmation de coupure"
+              },
+              "value": 2,
+              "min": 1,
+              "max": 10,
+              "hint": {
+                "en": "Number of consecutive failed probe rounds before an outage is declared.",
+                "fr": "Nombre de séries de sondes en échec consécutives avant de déclarer une coupure."
+              }
+            }
+          ]
+        },
+        {
+          "type": "group",
+          "label": {
+            "en": "Speed test",
+            "fr": "Test de débit"
+          },
+          "children": [
+            {
+              "id": "speedtest_source",
+              "type": "dropdown",
+              "label": {
+                "en": "Speed test source",
+                "fr": "Source du test de débit"
+              },
+              "value": "auto",
+              "hint": {
+                "en": "Livebox: test run by the box itself towards Orange servers, measures the full line speed. Homey: test run from Homey towards Cloudflare, limited by the Homey Ethernet port. Automatic: Livebox when a Livebox device is paired, Homey otherwise or if the Livebox test fails. (The Deco speed test is only available through the TP-Link cloud.)",
+                "fr": "Livebox : test lancé par la box elle-même vers les serveurs Orange, mesure le vrai débit de la ligne. Homey : test lancé depuis la Homey vers Cloudflare, limité par le port Ethernet de la Homey. Automatique : la Livebox si un appareil Livebox est ajouté, sinon ou en cas d'échec la Homey. (Le test de débit des Deco n'est accessible que via le cloud TP-Link.)"
+              },
+              "values": [
+                {
+                  "id": "auto",
+                  "label": {
+                    "en": "Automatic",
+                    "fr": "Automatique"
+                  }
+                },
+                {
+                  "id": "livebox",
+                  "label": {
+                    "en": "Box only (Livebox)",
+                    "fr": "Box uniquement (Livebox)"
+                  }
+                },
+                {
+                  "id": "homey",
+                  "label": {
+                    "en": "Homey (Cloudflare)",
+                    "fr": "Homey (Cloudflare)"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "speedtest_interval",
+              "type": "number",
+              "label": {
+                "en": "Speed test interval",
+                "fr": "Intervalle du test de débit"
+              },
+              "value": 180,
+              "min": 0,
+              "max": 1440,
+              "units": {
+                "en": "min",
+                "fr": "min"
+              },
+              "hint": {
+                "en": "0 = automatic tests disabled (use the Flow action). Each test transfers data: at 100 Mbit/s for 8 s, about 200 MB per test.",
+                "fr": "0 = tests automatiques désactivés (utiliser l'action de Flow). Chaque test consomme des données : à 100 Mbit/s pendant 8 s, environ 200 Mo par test."
+              }
+            },
+            {
+              "id": "speedtest_duration",
+              "type": "number",
+              "label": {
+                "en": "Duration per direction (Homey source)",
+                "fr": "Durée par sens (source Homey)"
+              },
+              "value": 8,
+              "min": 4,
+              "max": 20,
+              "units": {
+                "en": "s",
+                "fr": "s"
+              }
+            },
+            {
+              "id": "speedtest_streams",
+              "type": "number",
+              "label": {
+                "en": "Parallel connections (Homey source)",
+                "fr": "Connexions parallèles (source Homey)"
+              },
+              "value": 4,
+              "min": 1,
+              "max": 8
+            },
+            {
+              "id": "speedtest_note",
+              "type": "label",
+              "label": {
+                "en": "Measurement limit",
+                "fr": "Limite de mesure"
+              },
+              "value": "100 Mbit/s",
+              "hint": {
+                "en": "Homey source only: Homey Pro (Early 2023) has a 100 Mbit/s Ethernet adapter, so results cannot exceed ~94 Mbit/s even on a gigabit fibre line. The Livebox source has no such limit. Set the thresholds according to the source.",
+                "fr": "Source Homey uniquement : la Homey Pro (Early 2023) a un adaptateur Ethernet à 100 Mbit/s, les résultats ne peuvent donc pas dépasser ~94 Mbit/s, même sur une fibre gigabit. La source Livebox n'a pas cette limite. Réglez les seuils selon la source."
+              }
+            }
+          ]
+        },
+        {
+          "type": "group",
+          "label": {
+            "en": "Alert thresholds",
+            "fr": "Seuils d'alerte"
+          },
+          "children": [
+            {
+              "id": "min_download",
+              "type": "number",
+              "label": {
+                "en": "Minimum download (Livebox test)",
+                "fr": "Débit descendant minimum (test Livebox)"
+              },
+              "value": 500,
+              "min": 0,
+              "max": 10000,
+              "units": {
+                "en": "Mbit/s",
+                "fr": "Mbit/s"
+              },
+              "hint": {
+                "en": "Line speed measured by the box. Sosh / Orange fibre 1 Gbit/s: usually 800-940 Mbit/s. 0 = no alert.",
+                "fr": "Débit de la ligne mesuré par la box. Fibre Sosh / Orange 1 Gbit/s : en général 800-940 Mbit/s. 0 = pas d'alerte."
+              }
+            },
+            {
+              "id": "min_upload",
+              "type": "number",
+              "label": {
+                "en": "Minimum upload (Livebox test)",
+                "fr": "Débit montant minimum (test Livebox)"
+              },
+              "value": 400,
+              "min": 0,
+              "max": 10000,
+              "units": {
+                "en": "Mbit/s",
+                "fr": "Mbit/s"
+              },
+              "hint": {
+                "en": "Sosh fibre: up to 800 Mbit/s upload, usually 600-750. 0 = no alert.",
+                "fr": "Fibre Sosh : jusqu'à 800 Mbit/s en montant, en général 600-750. 0 = pas d'alerte."
+              }
+            },
+            {
+              "id": "min_download_homey",
+              "type": "number",
+              "label": {
+                "en": "Minimum download (Homey test)",
+                "fr": "Débit descendant minimum (test Homey)"
+              },
+              "value": 60,
+              "min": 0,
+              "max": 10000,
+              "units": {
+                "en": "Mbit/s",
+                "fr": "Mbit/s"
+              },
+              "hint": {
+                "en": "Used when the test runs from Homey (capped at ~94 Mbit/s by its Ethernet port). 0 = no alert.",
+                "fr": "Utilisé quand le test est lancé depuis la Homey (plafonné à ~94 Mbit/s par son port Ethernet). 0 = pas d'alerte."
+              }
+            },
+            {
+              "id": "min_upload_homey",
+              "type": "number",
+              "label": {
+                "en": "Minimum upload (Homey test)",
+                "fr": "Débit montant minimum (test Homey)"
+              },
+              "value": 60,
+              "min": 0,
+              "max": 10000,
+              "units": {
+                "en": "Mbit/s",
+                "fr": "Mbit/s"
+              },
+              "hint": {
+                "en": "0 = no alert.",
+                "fr": "0 = pas d'alerte."
+              }
+            },
+            {
+              "id": "max_latency",
+              "type": "number",
+              "label": {
+                "en": "Maximum latency",
+                "fr": "Latence maximum"
+              },
+              "value": 30,
+              "min": 0,
+              "max": 2000,
+              "units": {
+                "en": "ms",
+                "fr": "ms"
+              },
+              "hint": {
+                "en": "0 = no alert.",
+                "fr": "0 = pas d'alerte."
+              }
+            },
+            {
+              "id": "max_jitter",
+              "type": "number",
+              "label": {
+                "en": "Maximum jitter",
+                "fr": "Gigue maximum"
+              },
+              "value": 15,
+              "min": 0,
+              "max": 1000,
+              "units": {
+                "en": "ms",
+                "fr": "ms"
+              },
+              "hint": {
+                "en": "0 = no alert.",
+                "fr": "0 = pas d'alerte."
+              }
+            },
+            {
+              "id": "max_loss",
+              "type": "number",
+              "label": {
+                "en": "Maximum packet loss",
+                "fr": "Perte de paquets maximum"
+              },
+              "value": 10,
+              "min": 0,
+              "max": 100,
+              "units": {
+                "en": "%",
+                "fr": "%"
+              },
+              "hint": {
+                "en": "0 = no alert.",
+                "fr": "0 = pas d'alerte."
+              }
+            },
+            {
+              "id": "consecutive",
+              "type": "number",
+              "label": {
+                "en": "Consecutive measurements",
+                "fr": "Mesures consécutives"
+              },
+              "value": 2,
+              "min": 1,
+              "max": 10,
+              "hint": {
+                "en": "A threshold must be crossed this many times in a row to raise (and to clear) an alert.",
+                "fr": "Un seuil doit être franchi autant de fois de suite pour lever (et pour lever la fin d') une alerte."
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "livebox",
+      "name": {
+        "en": "Internet box",
+        "fr": "Box Internet"
+      },
+      "class": "sensor",
+      "capabilities": [
+        "netmon_online",
+        "netmon_power.rx",
+        "netmon_power.tx",
+        "netmon_throughput.down",
+        "netmon_throughput.up",
+        "netmon_uptime.wan",
+        "netmon_uptime.box",
+        "netmon_ip",
+        "netmon_text"
+      ],
+      "capabilitiesOptions": {
+        "netmon_online": {
+          "title": {
+            "en": "Internet link",
+            "fr": "Lien Internet"
+          }
+        },
+        "netmon_power.rx": {
+          "title": {
+            "en": "Received optical power",
+            "fr": "Puissance optique reçue"
+          }
+        },
+        "netmon_power.tx": {
+          "title": {
+            "en": "Transmitted optical power",
+            "fr": "Puissance optique émise"
+          }
+        },
+        "netmon_throughput.down": {
+          "title": {
+            "en": "Download traffic",
+            "fr": "Trafic descendant"
+          }
+        },
+        "netmon_throughput.up": {
+          "title": {
+            "en": "Upload traffic",
+            "fr": "Trafic montant"
+          }
+        },
+        "netmon_uptime.wan": {
+          "title": {
+            "en": "Internet connection uptime",
+            "fr": "Durée de la connexion Internet"
+          }
+        },
+        "netmon_uptime.box": {
+          "title": {
+            "en": "Box uptime",
+            "fr": "Durée de fonctionnement de la box"
+          }
+        },
+        "netmon_text": {
+          "title": {
+            "en": "Line state",
+            "fr": "État de la ligne"
+          }
+        }
+      },
+      "platforms": [
+        "local"
+      ],
+      "connectivity": [
+        "lan"
+      ],
+      "images": {
+        "small": "/drivers/livebox/assets/images/small.png",
+        "large": "/drivers/livebox/assets/images/large.png",
+        "xlarge": "/drivers/livebox/assets/images/xlarge.png"
+      },
+      "pair": [
+        {
+          "id": "configure"
+        }
+      ],
+      "settings": [
+        {
+          "type": "group",
+          "label": {
+            "en": "Connection",
+            "fr": "Connexion"
+          },
+          "children": [
+            {
+              "id": "operator",
+              "type": "dropdown",
+              "label": {
+                "en": "Internet provider",
+                "fr": "Fournisseur d'accès"
+              },
+              "value": "orange",
+              "values": [
+                {
+                  "id": "orange",
+                  "label": {
+                    "en": "Orange (Livebox)",
+                    "fr": "Orange (Livebox)"
+                  }
+                },
+                {
+                  "id": "sosh",
+                  "label": {
+                    "en": "Sosh (Livebox)",
+                    "fr": "Sosh (Livebox)"
+                  }
+                },
+                {
+                  "id": "bouygues",
+                  "label": {
+                    "en": "Bouygues Telecom (Bbox)",
+                    "fr": "Bouygues Telecom (Bbox)"
+                  }
+                },
+                {
+                  "id": "sfr",
+                  "label": {
+                    "en": "SFR / RED by SFR (SFR Box)",
+                    "fr": "SFR / RED by SFR (SFR Box)"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "host",
+              "type": "text",
+              "label": {
+                "en": "Box address",
+                "fr": "Adresse de la box"
+              },
+              "value": "192.168.1.1",
+              "hint": {
+                "en": "Livebox and SFR Box: usually 192.168.1.1. Bbox: 192.168.1.254.",
+                "fr": "Livebox et SFR Box : en général 192.168.1.1. Bbox : 192.168.1.254."
+              }
+            },
+            {
+              "id": "username",
+              "type": "text",
+              "label": {
+                "en": "User",
+                "fr": "Utilisateur"
+              },
+              "value": "admin"
+            },
+            {
+              "id": "password",
+              "type": "password",
+              "label": {
+                "en": "Administration password",
+                "fr": "Mot de passe d'administration"
+              },
+              "value": "",
+              "hint": {
+                "en": "Livebox: required (by default the first 8 characters of the Wi-Fi key printed under the box). Bbox and SFR Box: only if the box asks for it.",
+                "fr": "Livebox : obligatoire (par défaut les 8 premiers caractères de la clé Wi-Fi inscrite sous la box). Bbox et SFR Box : seulement si la box le demande."
+              }
+            },
+            {
+              "id": "poll_interval",
+              "type": "number",
+              "label": {
+                "en": "Polling interval",
+                "fr": "Intervalle d'interrogation"
+              },
+              "value": 60,
+              "min": 15,
+              "max": 600,
+              "units": {
+                "en": "s",
+                "fr": "s"
+              },
+              "hint": {
+                "en": "Traffic counters (Livebox, Bbox) are read every 10 s regardless of this value. SFR boxes do not expose them.",
+                "fr": "Les compteurs de trafic (Livebox, Bbox) sont lus toutes les 10 s quelle que soit cette valeur. Les SFR Box ne les exposent pas."
+              }
+            }
+          ]
+        },
+        {
+          "type": "group",
+          "label": {
+            "en": "Fibre signal (Livebox)",
+            "fr": "Signal fibre (Livebox)"
+          },
+          "children": [
+            {
+              "id": "min_rx_power",
+              "type": "number",
+              "label": {
+                "en": "Minimum received power",
+                "fr": "Puissance reçue minimum"
+              },
+              "value": -26,
+              "min": -40,
+              "max": 0,
+              "units": {
+                "en": "dBm",
+                "fr": "dBm"
+              },
+              "hint": {
+                "en": "GPON receivers work between -8 and -28 dBm; below -26 dBm the link is at risk (dirty connector, damaged fibre).",
+                "fr": "Un récepteur GPON fonctionne entre -8 et -28 dBm ; sous -26 dBm la liaison est fragile (connecteur sale, fibre abîmée)."
+              }
+            }
+          ]
+        },
+        {
+          "type": "group",
+          "label": {
+            "en": "Information",
+            "fr": "Informations"
+          },
+          "children": [
+            {
+              "id": "model",
+              "type": "label",
+              "label": {
+                "en": "Model",
+                "fr": "Modèle"
+              },
+              "value": ""
+            },
+            {
+              "id": "firmware",
+              "type": "label",
+              "label": {
+                "en": "Firmware",
+                "fr": "Firmware"
+              },
+              "value": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "deco",
+      "name": {
+        "en": "Deco node",
+        "fr": "Module Deco"
+      },
+      "class": "sensor",
+      "capabilities": [
+        "netmon_rate",
+        "netmon_online",
+        "netmon_clients",
+        "netmon_throughput.down",
+        "netmon_throughput.up",
+        "netmon_text"
+      ],
+      "capabilitiesOptions": {
+        "netmon_online": {
+          "title": {
+            "en": "Online",
+            "fr": "En ligne"
+          }
+        },
+        "netmon_text": {
+          "title": {
+            "en": "Backhaul",
+            "fr": "Liaison"
+          }
+        },
+        "netmon_throughput.down": {
+          "title": {
+            "en": "Download traffic (clients)",
+            "fr": "Trafic descendant (clients)"
+          }
+        },
+        "netmon_throughput.up": {
+          "title": {
+            "en": "Upload traffic (clients)",
+            "fr": "Trafic montant (clients)"
+          }
+        },
+        "netmon_online.internet": {
+          "title": {
+            "en": "Internet (Deco)",
+            "fr": "Internet (Deco)"
+          }
+        },
+        "netmon_clients.total": {
+          "title": {
+            "en": "Clients (network)",
+            "fr": "Clients (réseau)"
+          }
+        },
+        "netmon_clients.band24": {
+          "title": {
+            "en": "Clients 2.4 GHz",
+            "fr": "Clients 2,4 GHz"
+          }
+        },
+        "netmon_clients.band5": {
+          "title": {
+            "en": "Clients 5 GHz",
+            "fr": "Clients 5 GHz"
+          }
+        },
+        "netmon_clients.wired": {
+          "title": {
+            "en": "Wired clients",
+            "fr": "Clients filaires"
+          }
+        },
+        "netmon_load.cpu": {
+          "title": {
+            "en": "CPU",
+            "fr": "Processeur"
+          }
+        },
+        "netmon_load.mem": {
+          "title": {
+            "en": "Memory",
+            "fr": "Mémoire"
+          }
+        },
+        "netmon_signal.band5": {
+          "title": {
+            "en": "Backhaul signal 5 GHz",
+            "fr": "Signal de liaison 5 GHz"
+          }
+        },
+        "netmon_signal.band24": {
+          "title": {
+            "en": "Backhaul signal 2.4 GHz",
+            "fr": "Signal de liaison 2,4 GHz"
+          }
+        }
+      },
+      "platforms": [
+        "local"
+      ],
+      "connectivity": [
+        "lan"
+      ],
+      "images": {
+        "small": "/drivers/deco/assets/images/small.png",
+        "large": "/drivers/deco/assets/images/large.png",
+        "xlarge": "/drivers/deco/assets/images/xlarge.png"
+      },
+      "pair": [
+        {
+          "id": "configure"
+        }
+      ],
+      "settings": [
+        {
+          "type": "group",
+          "label": {
+            "en": "Connection",
+            "fr": "Connexion"
+          },
+          "children": [
+            {
+              "id": "host",
+              "type": "text",
+              "label": {
+                "en": "Main Deco address (connection)",
+                "fr": "Adresse du Deco principal (connexion)"
+              },
+              "value": "",
+              "hint": {
+                "en": "All Deco devices connect through the main Deco. The address of this Deco is shown below.",
+                "fr": "Tous les modules Deco passent par le Deco principal. L'adresse de ce Deco est indiquée plus bas."
+              }
+            },
+            {
+              "id": "password",
+              "type": "password",
+              "label": {
+                "en": "Owner password",
+                "fr": "Mot de passe du propriétaire"
+              },
+              "value": "",
+              "hint": {
+                "en": "Password of the TP-Link ID that owns the network. Manager accounts are refused by the Deco. Each login closes the owner session of the Deco mobile app: use a manager account in the app.",
+                "fr": "Mot de passe de l'ID TP-Link propriétaire du réseau. Les comptes gestionnaires sont refusés par le Deco. Chaque connexion ferme la session propriétaire de l'app mobile Deco : utilisez un compte gestionnaire dans l'app."
+              }
+            },
+            {
+              "id": "poll_interval",
+              "type": "number",
+              "label": {
+                "en": "Polling interval",
+                "fr": "Intervalle d'interrogation"
+              },
+              "value": 60,
+              "min": 30,
+              "max": 600,
+              "units": {
+                "en": "s",
+                "fr": "s"
+              },
+              "hint": {
+                "en": "Shared by all Deco devices (the shortest interval is used).",
+                "fr": "Commun à tous les modules Deco (le plus court est utilisé)."
+              }
+            }
+          ]
+        },
+        {
+          "type": "group",
+          "label": {
+            "en": "Mesh backhaul",
+            "fr": "Liaison maillée"
+          },
+          "children": [
+            {
+              "id": "min_signal",
+              "type": "number",
+              "label": {
+                "en": "Minimum backhaul signal",
+                "fr": "Signal de liaison minimum"
+              },
+              "value": 2,
+              "min": 0,
+              "max": 4,
+              "hint": {
+                "en": "Wireless satellites only. Signal level reported by the Deco (0 = none to 4 = excellent).",
+                "fr": "Satellites sans fil uniquement. Niveau de signal donné par le Deco (0 = nul à 4 = excellent)."
+              }
+            },
+            {
+              "id": "min_speed",
+              "type": "number",
+              "label": {
+                "en": "Minimum backhaul speed",
+                "fr": "Débit de liaison minimum"
+              },
+              "value": 150,
+              "min": 0,
+              "max": 5000,
+              "units": {
+                "en": "Mbit/s",
+                "fr": "Mbit/s"
+              },
+              "hint": {
+                "en": "0 = no alert.",
+                "fr": "0 = pas d'alerte."
+              }
+            }
+          ]
+        },
+        {
+          "type": "group",
+          "label": {
+            "en": "Average traffic",
+            "fr": "Débit moyen"
+          },
+          "children": [
+            {
+              "id": "avg_window",
+              "type": "number",
+              "label": {
+                "en": "Averaging window",
+                "fr": "Période de calcul de la moyenne"
+              },
+              "value": 15,
+              "min": 1,
+              "max": 120,
+              "units": {
+                "en": "min",
+                "fr": "min"
+              },
+              "hint": {
+                "en": "The \"Average traffic\" indicator (down / up) is the mean of the client traffic of this Deco over this period. Choose it as the device indicator to see it on the tile.",
+                "fr": "L'indicateur « Débit moyen » (descendant / montant) est la moyenne du trafic des clients de ce Deco sur cette période. Choisissez-le comme indicateur de l'appareil pour l'afficher sur la tuile."
+              }
+            }
+          ]
+        },
+        {
+          "type": "group",
+          "label": {
+            "en": "This Deco",
+            "fr": "Ce Deco"
+          },
+          "children": [
+            {
+              "id": "node_ip",
+              "type": "label",
+              "label": {
+                "en": "IP address",
+                "fr": "Adresse IP"
+              },
+              "value": ""
+            },
+            {
+              "id": "node_role",
+              "type": "label",
+              "label": {
+                "en": "Role",
+                "fr": "Rôle"
+              },
+              "value": ""
+            },
+            {
+              "id": "node_mac",
+              "type": "label",
+              "label": {
+                "en": "MAC address",
+                "fr": "Adresse MAC"
+              },
+              "value": ""
+            },
+            {
+              "id": "node_model",
+              "type": "label",
+              "label": {
+                "en": "Model",
+                "fr": "Modèle"
+              },
+              "value": ""
+            },
+            {
+              "id": "node_firmware",
+              "type": "label",
+              "label": {
+                "en": "Firmware",
+                "fr": "Firmware"
+              },
+              "value": ""
+            },
+            {
+              "id": "diag_rates",
+              "type": "label",
+              "label": {
+                "en": "Traffic diagnostic",
+                "fr": "Diagnostic du trafic"
+              },
+              "value": "",
+              "hint": {
+                "en": "Main Deco only: clients with a non-zero rate in the per-node lists / in the global list, then the fields returned by the firmware.",
+                "fr": "Deco principal uniquement : clients avec un débit non nul dans les listes par module / dans la liste globale, puis les champs renvoyés par le firmware."
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "capabilities": {
+    "netmon_online": {
+      "type": "boolean",
+      "title": {
+        "en": "Connected",
+        "fr": "Connecté"
+      },
+      "getable": true,
+      "setable": false,
+      "uiComponent": "sensor",
+      "insights": true,
+      "insightsTitleTrue": {
+        "en": "Connected",
+        "fr": "Connecté"
+      },
+      "insightsTitleFalse": {
+        "en": "Disconnected",
+        "fr": "Déconnecté"
+      },
+      "icon": "/assets/capabilities/online.svg"
+    },
+    "netmon_status": {
+      "type": "enum",
+      "title": {
+        "en": "Status",
+        "fr": "État"
+      },
+      "getable": true,
+      "setable": false,
+      "uiComponent": "sensor",
+      "icon": "/assets/capabilities/status.svg",
+      "values": [
+        {
+          "id": "ok",
+          "title": {
+            "en": "Good",
+            "fr": "Bon"
+          }
+        },
+        {
+          "id": "degraded",
+          "title": {
+            "en": "Degraded",
+            "fr": "Dégradé"
+          }
+        },
+        {
+          "id": "down",
+          "title": {
+            "en": "Down",
+            "fr": "Coupé"
+          }
+        },
+        {
+          "id": "unknown",
+          "title": {
+            "en": "Unknown",
+            "fr": "Inconnu"
+          }
+        }
+      ]
+    },
+    "netmon_download": {
+      "type": "number",
+      "title": {
+        "en": "Download",
+        "fr": "Débit descendant"
+      },
+      "units": {
+        "en": "Mbit/s",
+        "fr": "Mbit/s"
+      },
+      "decimals": 1,
+      "getable": true,
+      "setable": false,
+      "uiComponent": "sensor",
+      "insights": true,
+      "chartType": "spline",
+      "icon": "/assets/capabilities/download.svg"
+    },
+    "netmon_upload": {
+      "type": "number",
+      "title": {
+        "en": "Upload",
+        "fr": "Débit montant"
+      },
+      "units": {
+        "en": "Mbit/s",
+        "fr": "Mbit/s"
+      },
+      "decimals": 1,
+      "getable": true,
+      "setable": false,
+      "uiComponent": "sensor",
+      "insights": true,
+      "chartType": "spline",
+      "icon": "/assets/capabilities/upload.svg"
+    },
+    "netmon_latency": {
+      "type": "number",
+      "title": {
+        "en": "Latency",
+        "fr": "Latence"
+      },
+      "units": {
+        "en": "ms",
+        "fr": "ms"
+      },
+      "decimals": 1,
+      "getable": true,
+      "setable": false,
+      "uiComponent": "sensor",
+      "insights": true,
+      "chartType": "spline",
+      "icon": "/assets/capabilities/latency.svg"
+    },
+    "netmon_jitter": {
+      "type": "number",
+      "title": {
+        "en": "Jitter",
+        "fr": "Gigue"
+      },
+      "units": {
+        "en": "ms",
+        "fr": "ms"
+      },
+      "decimals": 1,
+      "getable": true,
+      "setable": false,
+      "uiComponent": "sensor",
+      "insights": true,
+      "chartType": "spline",
+      "icon": "/assets/capabilities/latency.svg"
+    },
+    "netmon_loss": {
+      "type": "number",
+      "title": {
+        "en": "Packet loss",
+        "fr": "Perte de paquets"
+      },
+      "units": {
+        "en": "%",
+        "fr": "%"
+      },
+      "decimals": 0,
+      "getable": true,
+      "setable": false,
+      "uiComponent": "sensor",
+      "insights": true,
+      "chartType": "spline",
+      "icon": "/assets/capabilities/loss.svg"
+    },
+    "netmon_dns": {
+      "type": "number",
+      "title": {
+        "en": "DNS resolution",
+        "fr": "Résolution DNS"
+      },
+      "units": {
+        "en": "ms",
+        "fr": "ms"
+      },
+      "decimals": 0,
+      "getable": true,
+      "setable": false,
+      "uiComponent": "sensor",
+      "insights": true,
+      "chartType": "spline",
+      "icon": "/assets/capabilities/latency.svg"
+    },
+    "netmon_outages": {
+      "type": "number",
+      "title": {
+        "en": "Outages today",
+        "fr": "Coupures du jour"
+      },
+      "decimals": 0,
+      "getable": true,
+      "setable": false,
+      "uiComponent": "sensor",
+      "insights": true,
+      "chartType": "stepLine",
+      "icon": "/assets/capabilities/status.svg"
+    },
+    "netmon_downtime": {
+      "type": "number",
+      "title": {
+        "en": "Downtime today",
+        "fr": "Durée de coupure du jour"
+      },
+      "units": {
+        "en": "min",
+        "fr": "min"
+      },
+      "decimals": 1,
+      "getable": true,
+      "setable": false,
+      "uiComponent": "sensor",
+      "insights": true,
+      "chartType": "stepLine",
+      "icon": "/assets/capabilities/status.svg"
+    },
+    "netmon_throughput": {
+      "type": "number",
+      "title": {
+        "en": "Traffic",
+        "fr": "Trafic"
+      },
+      "units": {
+        "en": "Mbit/s",
+        "fr": "Mbit/s"
+      },
+      "decimals": 1,
+      "getable": true,
+      "setable": false,
+      "uiComponent": "sensor",
+      "insights": true,
+      "chartType": "spline",
+      "icon": "/assets/capabilities/download.svg"
+    },
+    "netmon_power": {
+      "type": "number",
+      "title": {
+        "en": "Optical power",
+        "fr": "Puissance optique"
+      },
+      "units": {
+        "en": "dBm",
+        "fr": "dBm"
+      },
+      "decimals": 2,
+      "getable": true,
+      "setable": false,
+      "uiComponent": "sensor",
+      "insights": true,
+      "chartType": "spline",
+      "icon": "/assets/capabilities/fiber.svg"
+    },
+    "netmon_uptime": {
+      "type": "number",
+      "title": {
+        "en": "Uptime",
+        "fr": "Durée de connexion"
+      },
+      "units": {
+        "en": "h",
+        "fr": "h"
+      },
+      "decimals": 1,
+      "getable": true,
+      "setable": false,
+      "uiComponent": "sensor",
+      "insights": true,
+      "chartType": "stepLine",
+      "icon": "/assets/capabilities/status.svg"
+    },
+    "netmon_ip": {
+      "type": "string",
+      "title": {
+        "en": "Public IP",
+        "fr": "IP publique"
+      },
+      "getable": true,
+      "setable": false,
+      "uiComponent": "sensor",
+      "icon": "/assets/capabilities/online.svg"
+    },
+    "netmon_text": {
+      "type": "string",
+      "title": {
+        "en": "Info",
+        "fr": "Info"
+      },
+      "getable": true,
+      "setable": false,
+      "uiComponent": "sensor",
+      "icon": "/assets/capabilities/status.svg"
+    },
+    "netmon_rate": {
+      "type": "string",
+      "title": {
+        "en": "Average traffic",
+        "fr": "Débit moyen"
+      },
+      "getable": true,
+      "setable": false,
+      "uiComponent": "sensor",
+      "icon": "/assets/capabilities/download.svg"
+    },
+    "netmon_clients": {
+      "type": "number",
+      "title": {
+        "en": "Clients",
+        "fr": "Clients"
+      },
+      "decimals": 0,
+      "getable": true,
+      "setable": false,
+      "uiComponent": "sensor",
+      "insights": true,
+      "chartType": "stepLine",
+      "icon": "/assets/capabilities/clients.svg"
+    },
+    "netmon_signal": {
+      "type": "number",
+      "title": {
+        "en": "Backhaul signal",
+        "fr": "Signal de liaison"
+      },
+      "decimals": 0,
+      "getable": true,
+      "setable": false,
+      "uiComponent": "sensor",
+      "insights": true,
+      "chartType": "stepLine",
+      "icon": "/assets/capabilities/wifi.svg"
+    },
+    "netmon_speed": {
+      "type": "number",
+      "title": {
+        "en": "Backhaul speed",
+        "fr": "Débit de liaison"
+      },
+      "units": {
+        "en": "Mbit/s",
+        "fr": "Mbit/s"
+      },
+      "decimals": 0,
+      "getable": true,
+      "setable": false,
+      "uiComponent": "sensor",
+      "insights": true,
+      "chartType": "spline",
+      "icon": "/assets/capabilities/wifi.svg"
+    },
+    "netmon_load": {
+      "type": "number",
+      "title": {
+        "en": "Load",
+        "fr": "Charge"
+      },
+      "units": {
+        "en": "%",
+        "fr": "%"
+      },
+      "decimals": 0,
+      "getable": true,
+      "setable": false,
+      "uiComponent": "sensor",
+      "insights": true,
+      "chartType": "spline",
+      "icon": "/assets/capabilities/cpu.svg"
+    }
+  },
+  "flow": {
+    "triggers": [
+      {
+        "id": "internet_down",
+        "title": {
+          "en": "Internet went down",
+          "fr": "Internet est coupé"
+        },
+        "hint": {
+          "en": "After the confirmation rounds set in the device.",
+          "fr": "Après le nombre de confirmations réglé dans l'appareil."
+        },
+        "tokens": [
+          {
+            "name": "since",
+            "type": "string",
+            "title": {
+              "en": "Since",
+              "fr": "Depuis"
+            },
+            "example": "14:32"
+          },
+          {
+            "name": "cause",
+            "type": "string",
+            "title": {
+              "en": "Cause (internet / lan)",
+              "fr": "Cause (internet / lan)"
+            },
+            "example": "internet"
+          }
+        ],
+        "args": [
+          {
+            "type": "device",
+            "name": "device",
+            "filter": "driver_id=internet"
+          }
+        ]
+      },
+      {
+        "id": "internet_restored",
+        "title": {
+          "en": "Internet is back",
+          "fr": "Internet est rétabli"
+        },
+        "tokens": [
+          {
+            "name": "duration",
+            "type": "number",
+            "title": {
+              "en": "Outage duration (s)",
+              "fr": "Durée de coupure (s)"
+            },
+            "example": 95
+          },
+          {
+            "name": "duration_text",
+            "type": "string",
+            "title": {
+              "en": "Outage duration",
+              "fr": "Durée de coupure"
+            },
+            "example": "1 min 35 s"
+          },
+          {
+            "name": "since",
+            "type": "string",
+            "title": {
+              "en": "Down since",
+              "fr": "Coupé depuis"
+            },
+            "example": "14:32"
+          }
+        ],
+        "args": [
+          {
+            "type": "device",
+            "name": "device",
+            "filter": "driver_id=internet"
+          }
+        ]
+      },
+      {
+        "id": "speedtest_done",
+        "title": {
+          "en": "A speed test finished",
+          "fr": "Un test de débit est terminé"
+        },
+        "tokens": [
+          {
+            "name": "download",
+            "type": "number",
+            "title": {
+              "en": "Download (Mbit/s)",
+              "fr": "Descendant (Mbit/s)"
+            },
+            "example": 93.5
+          },
+          {
+            "name": "upload",
+            "type": "number",
+            "title": {
+              "en": "Upload (Mbit/s)",
+              "fr": "Montant (Mbit/s)"
+            },
+            "example": 91.2
+          },
+          {
+            "name": "latency",
+            "type": "number",
+            "title": {
+              "en": "Latency (ms)",
+              "fr": "Latence (ms)"
+            },
+            "example": 6.1
+          },
+          {
+            "name": "jitter",
+            "type": "number",
+            "title": {
+              "en": "Jitter (ms)",
+              "fr": "Gigue (ms)"
+            },
+            "example": 0.8
+          },
+          {
+            "name": "server",
+            "type": "string",
+            "title": {
+              "en": "Server",
+              "fr": "Serveur"
+            },
+            "example": "MRS"
+          }
+        ],
+        "args": [
+          {
+            "type": "device",
+            "name": "device",
+            "filter": "driver_id=internet"
+          }
+        ]
+      },
+      {
+        "id": "speedtest_failed",
+        "title": {
+          "en": "A speed test failed",
+          "fr": "Un test de débit a échoué"
+        },
+        "tokens": [
+          {
+            "name": "error",
+            "type": "string",
+            "title": {
+              "en": "Error",
+              "fr": "Erreur"
+            },
+            "example": "timeout"
+          }
+        ],
+        "args": [
+          {
+            "type": "device",
+            "name": "device",
+            "filter": "driver_id=internet"
+          }
+        ]
+      },
+      {
+        "id": "quality_degraded",
+        "title": {
+          "en": "Connection quality degraded",
+          "fr": "La qualité de connexion s'est dégradée"
+        },
+        "hint": {
+          "en": "A threshold set in the device was crossed several times in a row.",
+          "fr": "Un seuil réglé dans l'appareil a été franchi plusieurs fois de suite."
+        },
+        "tokens": [
+          {
+            "name": "metric",
+            "type": "string",
+            "title": {
+              "en": "Measurement",
+              "fr": "Mesure"
+            },
+            "example": "Latence"
+          },
+          {
+            "name": "value",
+            "type": "number",
+            "title": {
+              "en": "Value",
+              "fr": "Valeur"
+            },
+            "example": 48
+          },
+          {
+            "name": "limit",
+            "type": "number",
+            "title": {
+              "en": "Threshold",
+              "fr": "Seuil"
+            },
+            "example": 30
+          }
+        ],
+        "args": [
+          {
+            "type": "device",
+            "name": "device",
+            "filter": "driver_id=internet"
+          }
+        ]
+      },
+      {
+        "id": "quality_recovered",
+        "title": {
+          "en": "Connection quality back to normal",
+          "fr": "La qualité de connexion est revenue à la normale"
+        },
+        "tokens": [
+          {
+            "name": "metric",
+            "type": "string",
+            "title": {
+              "en": "Measurement",
+              "fr": "Mesure"
+            },
+            "example": "Latence"
+          },
+          {
+            "name": "value",
+            "type": "number",
+            "title": {
+              "en": "Value",
+              "fr": "Valeur"
+            },
+            "example": 7
+          }
+        ],
+        "args": [
+          {
+            "type": "device",
+            "name": "device",
+            "filter": "driver_id=internet"
+          }
+        ]
+      },
+      {
+        "id": "wan_down",
+        "title": {
+          "en": "Box Internet link went down",
+          "fr": "Le lien Internet de la box est tombé"
+        },
+        "tokens": [
+          {
+            "name": "state",
+            "type": "string",
+            "title": {
+              "en": "Line state",
+              "fr": "État de la ligne"
+            },
+            "example": "O1_Initial"
+          }
+        ],
+        "args": [
+          {
+            "type": "device",
+            "name": "device",
+            "filter": "driver_id=livebox"
+          }
+        ]
+      },
+      {
+        "id": "wan_up",
+        "title": {
+          "en": "Box Internet link is back",
+          "fr": "Le lien Internet de la box est rétabli"
+        },
+        "tokens": [
+          {
+            "name": "duration",
+            "type": "number",
+            "title": {
+              "en": "Outage duration (s)",
+              "fr": "Durée de coupure (s)"
+            },
+            "example": 300
+          }
+        ],
+        "args": [
+          {
+            "type": "device",
+            "name": "device",
+            "filter": "driver_id=livebox"
+          }
+        ]
+      },
+      {
+        "id": "wan_reconnected",
+        "title": {
+          "en": "Internet connection was renewed",
+          "fr": "La connexion Internet a été renouvelée"
+        },
+        "hint": {
+          "en": "The connection uptime restarted from zero (reconnection by Orange or the box).",
+          "fr": "La durée de connexion est repartie de zéro (reconnexion par Orange ou par la box)."
+        },
+        "tokens": [
+          {
+            "name": "previous",
+            "type": "number",
+            "title": {
+              "en": "Previous uptime (h)",
+              "fr": "Durée précédente (h)"
+            },
+            "example": 168.5
+          }
+        ],
+        "args": [
+          {
+            "type": "device",
+            "name": "device",
+            "filter": "driver_id=livebox"
+          }
+        ]
+      },
+      {
+        "id": "box_rebooted",
+        "title": {
+          "en": "The box rebooted",
+          "fr": "La box a redémarré"
+        },
+        "tokens": [],
+        "args": [
+          {
+            "type": "device",
+            "name": "device",
+            "filter": "driver_id=livebox"
+          }
+        ]
+      },
+      {
+        "id": "public_ip_changed",
+        "title": {
+          "en": "Public IP address changed",
+          "fr": "L'adresse IP publique a changé"
+        },
+        "tokens": [
+          {
+            "name": "ip",
+            "type": "string",
+            "title": {
+              "en": "New IP",
+              "fr": "Nouvelle IP"
+            },
+            "example": "90.1.2.3"
+          },
+          {
+            "name": "previous",
+            "type": "string",
+            "title": {
+              "en": "Previous IP",
+              "fr": "IP précédente"
+            },
+            "example": "90.1.2.2"
+          }
+        ],
+        "args": [
+          {
+            "type": "device",
+            "name": "device",
+            "filter": "driver_id=livebox"
+          }
+        ]
+      },
+      {
+        "id": "fiber_signal_low",
+        "title": {
+          "en": "Fibre signal too low",
+          "fr": "Signal fibre trop faible"
+        },
+        "tokens": [
+          {
+            "name": "rx",
+            "type": "number",
+            "title": {
+              "en": "Received power (dBm)",
+              "fr": "Puissance reçue (dBm)"
+            },
+            "example": -27.1
+          }
+        ],
+        "args": [
+          {
+            "type": "device",
+            "name": "device",
+            "filter": "driver_id=livebox"
+          }
+        ]
+      },
+      {
+        "id": "fiber_signal_ok",
+        "title": {
+          "en": "Fibre signal back to normal",
+          "fr": "Signal fibre revenu à la normale"
+        },
+        "tokens": [
+          {
+            "name": "rx",
+            "type": "number",
+            "title": {
+              "en": "Received power (dBm)",
+              "fr": "Puissance reçue (dBm)"
+            },
+            "example": -19.4
+          }
+        ],
+        "args": [
+          {
+            "type": "device",
+            "name": "device",
+            "filter": "driver_id=livebox"
+          }
+        ]
+      },
+      {
+        "id": "node_offline",
+        "title": {
+          "en": "Deco went offline",
+          "fr": "Le Deco est hors ligne"
+        },
+        "tokens": [],
+        "args": [
+          {
+            "type": "device",
+            "name": "device",
+            "filter": "driver_id=deco"
+          }
+        ]
+      },
+      {
+        "id": "node_online",
+        "title": {
+          "en": "Deco is back online",
+          "fr": "Le Deco est de nouveau en ligne"
+        },
+        "tokens": [
+          {
+            "name": "duration",
+            "type": "number",
+            "title": {
+              "en": "Offline duration (s)",
+              "fr": "Durée hors ligne (s)"
+            },
+            "example": 120
+          }
+        ],
+        "args": [
+          {
+            "type": "device",
+            "name": "device",
+            "filter": "driver_id=deco"
+          }
+        ]
+      },
+      {
+        "id": "backhaul_weak",
+        "title": {
+          "en": "Mesh backhaul is weak",
+          "fr": "La liaison maillée est faible"
+        },
+        "tokens": [
+          {
+            "name": "signal",
+            "type": "number",
+            "title": {
+              "en": "Signal level",
+              "fr": "Niveau de signal"
+            },
+            "example": 1
+          },
+          {
+            "name": "speed",
+            "type": "number",
+            "title": {
+              "en": "Speed (Mbit/s)",
+              "fr": "Débit (Mbit/s)"
+            },
+            "example": 86
+          }
+        ],
+        "args": [
+          {
+            "type": "device",
+            "name": "device",
+            "filter": "driver_id=deco"
+          }
+        ]
+      },
+      {
+        "id": "backhaul_ok",
+        "title": {
+          "en": "Mesh backhaul back to normal",
+          "fr": "La liaison maillée est revenue à la normale"
+        },
+        "tokens": [
+          {
+            "name": "signal",
+            "type": "number",
+            "title": {
+              "en": "Signal level",
+              "fr": "Niveau de signal"
+            },
+            "example": 3
+          },
+          {
+            "name": "speed",
+            "type": "number",
+            "title": {
+              "en": "Speed (Mbit/s)",
+              "fr": "Débit (Mbit/s)"
+            },
+            "example": 480
+          }
+        ],
+        "args": [
+          {
+            "type": "device",
+            "name": "device",
+            "filter": "driver_id=deco"
+          }
+        ]
+      },
+      {
+        "id": "client_connected",
+        "title": {
+          "en": "A device connected to this Deco",
+          "fr": "Un appareil s'est connecté à ce Deco"
+        },
+        "tokens": [
+          {
+            "name": "name",
+            "type": "string",
+            "title": {
+              "en": "Name",
+              "fr": "Nom"
+            },
+            "example": "iPhone"
+          },
+          {
+            "name": "mac",
+            "type": "string",
+            "title": {
+              "en": "MAC",
+              "fr": "MAC"
+            },
+            "example": "11:22:33:44:55:66"
+          },
+          {
+            "name": "ip",
+            "type": "string",
+            "title": {
+              "en": "IP",
+              "fr": "IP"
+            },
+            "example": "192.168.68.20"
+          },
+          {
+            "name": "band",
+            "type": "string",
+            "title": {
+              "en": "Connection",
+              "fr": "Connexion"
+            },
+            "example": "5 GHz"
+          },
+          {
+            "name": "network",
+            "type": "string",
+            "title": {
+              "en": "Network",
+              "fr": "Réseau"
+            },
+            "example": "main"
+          }
+        ],
+        "args": [
+          {
+            "type": "device",
+            "name": "device",
+            "filter": "driver_id=deco"
+          }
+        ]
+      },
+      {
+        "id": "client_disconnected",
+        "title": {
+          "en": "A device disconnected from this Deco",
+          "fr": "Un appareil s'est déconnecté de ce Deco"
+        },
+        "tokens": [
+          {
+            "name": "name",
+            "type": "string",
+            "title": {
+              "en": "Name",
+              "fr": "Nom"
+            },
+            "example": "iPhone"
+          },
+          {
+            "name": "mac",
+            "type": "string",
+            "title": {
+              "en": "MAC",
+              "fr": "MAC"
+            },
+            "example": "11:22:33:44:55:66"
+          }
+        ],
+        "args": [
+          {
+            "type": "device",
+            "name": "device",
+            "filter": "driver_id=deco"
+          }
+        ]
+      }
+    ],
+    "conditions": [
+      {
+        "id": "internet_is_online",
+        "title": {
+          "en": "Internet !{{is|is not}} available",
+          "fr": "Internet !{{est|n'est pas}} disponible"
+        },
+        "args": [
+          {
+            "type": "device",
+            "name": "device",
+            "filter": "driver_id=internet"
+          }
+        ]
+      },
+      {
+        "id": "quality_is_ok",
+        "title": {
+          "en": "Connection quality !{{is|is not}} good",
+          "fr": "La qualité de connexion !{{est|n'est pas}} bonne"
+        },
+        "hint": {
+          "en": "Good = Internet available and no threshold alert in progress.",
+          "fr": "Bonne = Internet disponible et aucune alerte de seuil en cours."
+        },
+        "args": [
+          {
+            "type": "device",
+            "name": "device",
+            "filter": "driver_id=internet"
+          }
+        ]
+      },
+      {
+        "id": "wan_is_up",
+        "title": {
+          "en": "Box Internet link !{{is|is not}} up",
+          "fr": "Le lien Internet de la box !{{est|n'est pas}} actif"
+        },
+        "args": [
+          {
+            "type": "device",
+            "name": "device",
+            "filter": "driver_id=livebox"
+          }
+        ]
+      },
+      {
+        "id": "node_is_online",
+        "title": {
+          "en": "Deco !{{is|is not}} online",
+          "fr": "Le Deco !{{est|n'est pas}} en ligne"
+        },
+        "args": [
+          {
+            "type": "device",
+            "name": "device",
+            "filter": "driver_id=deco"
+          }
+        ]
+      },
+      {
+        "id": "client_is_connected",
+        "titleFormatted": {
+          "en": "A device named [[name]] !{{is|is not}} connected to the network",
+          "fr": "Un appareil nommé [[name]] !{{est|n'est pas}} connecté au réseau"
+        },
+        "hint": {
+          "en": "Name (or part of it), IP or MAC address, as shown in the Deco app. Searches the whole mesh.",
+          "fr": "Nom (ou partie du nom), adresse IP ou MAC, tel qu'affiché dans l'app Deco. Recherche sur tout le réseau maillé."
+        },
+        "args": [
+          {
+            "type": "device",
+            "name": "device",
+            "filter": "driver_id=deco"
+          },
+          {
+            "type": "text",
+            "name": "name",
+            "placeholder": {
+              "en": "iPhone",
+              "fr": "iPhone"
+            }
+          }
+        ],
+        "title": {
+          "en": "A device !{{is|is not}} connected to the network",
+          "fr": "Un appareil !{{est|n'est pas}} connecté au réseau"
+        }
+      }
+    ],
+    "actions": [
+      {
+        "id": "run_speedtest",
+        "title": {
+          "en": "Run a speed test",
+          "fr": "Lancer un test de débit"
+        },
+        "hint": {
+          "en": "Results are set on the device and the \"speed test finished\" card is triggered.",
+          "fr": "Les résultats sont enregistrés sur l'appareil et la carte « test de débit terminé » est déclenchée."
+        },
+        "args": [
+          {
+            "type": "device",
+            "name": "device",
+            "filter": "driver_id=internet"
+          }
+        ]
+      },
+      {
+        "id": "run_speedtest_tokens",
+        "title": {
+          "en": "Run a speed test and return the results",
+          "fr": "Lancer un test de débit et renvoyer les résultats"
+        },
+        "advanced": true,
+        "tokens": [
+          {
+            "name": "download",
+            "type": "number",
+            "title": {
+              "en": "Download (Mbit/s)",
+              "fr": "Descendant (Mbit/s)"
+            },
+            "example": 93.5
+          },
+          {
+            "name": "upload",
+            "type": "number",
+            "title": {
+              "en": "Upload (Mbit/s)",
+              "fr": "Montant (Mbit/s)"
+            },
+            "example": 91.2
+          },
+          {
+            "name": "latency",
+            "type": "number",
+            "title": {
+              "en": "Latency (ms)",
+              "fr": "Latence (ms)"
+            },
+            "example": 6.1
+          }
+        ],
+        "args": [
+          {
+            "type": "device",
+            "name": "device",
+            "filter": "driver_id=internet"
+          }
+        ]
+      }
+    ]
+  }
+}

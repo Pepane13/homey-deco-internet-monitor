@@ -1,0 +1,68 @@
+{
+  "metric": {
+    "download": "Débit descendant",
+    "upload": "Débit montant",
+    "latency": "Latence",
+    "jitter": "Gigue",
+    "loss": "Perte de paquets"
+  },
+  "band": {
+    "band2_4": "2,4 GHz",
+    "band5": "5 GHz",
+    "band6": "6 GHz",
+    "wired": "Filaire"
+  },
+  "status": {
+    "speedtest_running": "Test de débit en cours…",
+    "unreachable": "Injoignable",
+    "auth": "Connexion refusée : vérifiez le mot de passe",
+    "deco_owner": "Connexion refusée : utilisez le mot de passe du compte propriétaire (les comptes gestionnaires sont refusés)",
+    "unsupported": "Ce firmware Deco utilise un ancien protocole de connexion, pas encore pris en charge"
+  },
+  "pair": {
+    "livebox_subtitle": "Connexion locale à l'interface d'administration de la Livebox",
+    "deco_subtitle": "Connexion locale au Deco principal (celui relié à la box)",
+    "host": "Adresse IP",
+    "livebox_host_hint": "En général 192.168.1.1",
+    "deco_host_hint": "Visible dans l'app Deco : Plus > Avancé > IPv4 (« IP LAN »)",
+    "password": "Mot de passe",
+    "livebox_password_hint": "Mot de passe d'administration de la Livebox (par défaut les 8 premiers caractères de la clé Wi-Fi inscrite sous la box)",
+    "deco_password_hint": "Mot de passe de l'ID TP-Link propriétaire. Chaque connexion ferme la session propriétaire de l'app Deco : utilisez un compte gestionnaire dans l'app.",
+    "button": "Se connecter",
+    "connecting": "Connexion…",
+    "found": "Connecté :",
+    "nodes": "Modules Deco trouvés",
+    "add": "Ajouter",
+    "main": "principal",
+    "already": "déjà ajouté",
+    "none_selected": "Sélectionnez au moins un Deco",
+    "box_title": "Box Internet",
+    "box_subtitle": "Choisissez votre fournisseur d'accès, puis connectez-vous à votre box sur le réseau local",
+    "operator": "Fournisseur d'accès",
+    "next": "Suivant",
+    "back": "Retour",
+    "password_hint_orange": "Mot de passe d'administration de la Livebox (par défaut les 8 premiers caractères de la clé Wi-Fi inscrite sous la box)",
+    "password_hint_sosh": "Mot de passe d'administration de la Livebox (par défaut les 8 premiers caractères de la clé Wi-Fi inscrite sous la box)",
+    "password_hint_bouygues": "Facultatif : mot de passe d'administration de la Bbox, seulement si votre box l'exige. Un mauvais mot de passe bloque la connexion à la Bbox pendant quelques minutes.",
+    "password_hint_sfr": "Facultatif : l'état de la SFR Box est lisible sans mot de passe. Ne le remplissez que si votre box l'exige."
+  },
+  "errors": {
+    "invalid_ip": "Saisissez une adresse IP valide, par exemple 192.168.1.1",
+    "password_required": "Le mot de passe est obligatoire",
+    "unreachable": "Appareil injoignable :",
+    "auth": "Connexion refusée, vérifiez le mot de passe.",
+    "deco_auth": "Connexion refusée. Utilisez le mot de passe de l'ID TP-Link propriétaire (les comptes gestionnaires sont refusés par le Deco).",
+    "unsupported": "Ce firmware Deco utilise un ancien protocole de connexion, pas encore pris en charge.",
+    "read_failed": "Échec de lecture :",
+    "no_session": "Connectez-vous d'abord",
+    "operator_required": "Choisissez votre fournisseur d'accès",
+    "auth_optional": "La box demande son mot de passe d'administration : saisissez-le et réessayez.",
+    "locked": "La box refuse temporairement les connexions après des échecs : attendez 15 minutes.",
+    "wrong_operator": "La réponse ne correspond pas à ce fournisseur : vérifiez le fournisseur choisi et l'adresse."
+  },
+  "deco": {
+    "main": "Deco principal (relié à la box)",
+    "role_main": "Principal (relié à la box)",
+    "role_satellite": "Satellite"
+  }
+}

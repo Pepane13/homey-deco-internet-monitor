@@ -1,0 +1,101 @@
+<header class="homey-header">
+  <h1 class="homey-title" id="title"></h1>
+  <p class="homey-subtitle" id="subtitle"></p>
+</header>
+
+<!-- Step 1: operator -->
+<form class="homey-form" id="step-operator" onsubmit="return false;">
+  <fieldset class="homey-form-fieldset">
+    <legend class="homey-form-legend" id="operator-legend"></legend>
+    <div id="operators"></div>
+  </fieldset>
+  <button class="homey-button-primary-full" id="next"></button>
+</form>
+
+<!-- Step 2: connection -->
+<form class="homey-form" id="step-connect" style="display:none;" onsubmit="return false;">
+  <p id="chosen" style="font-weight:600;"></p>
+  <div class="homey-form-group">
+    <label class="homey-form-label" for="host" id="host-label"></label>
+    <input class="homey-form-input" id="host" type="text" inputmode="url" autocapitalize="off" autocorrect="off" spellcheck="false" autocomplete="off" />
+  </div>
+  <div class="homey-form-group" id="password-group">
+    <label class="homey-form-label" for="password" id="password-label"></label>
+    <input class="homey-form-input" id="password" type="password" autocomplete="off" />
+    <p class="homey-form-hint" id="password-hint"></p>
+  </div>
+  <p id="status" style="min-height:1.5em;"></p>
+  <button class="homey-button-primary-full" id="connect"></button>
+  <button class="homey-button-transparent-full" id="back"></button>
+</form>
+
+<script type="application/javascript">
+  const $ = (id) => document.getElementById(id);
+  const t = {
+    title: 'pair.box_title', subtitle: 'pair.box_subtitle', 'operator-legend': 'pair.operator',
+    next: 'pair.next', 'host-label': 'pair.host', 'password-label': 'pair.password', connect: 'pair.button', back: 'pair.back',
+  };
+  for (const [id, key] of Object.entries(t)) $(id).textContent = Homey.__(key);
+
+  let operators = [];
+  let chosen = null;
+
+  Homey.emit('operators').then((list) => {
+    operators = list;
+    const box = $('operators');
+    list.forEach((o, i) => {
+      const label = document.createElement('label');
+      label.className = 'homey-form-radio';
+      const input = document.createElement('input');
+      input.className = 'homey-form-radio-input';
+      input.type = 'radio';
+      input.name = 'operator';
+      input.value = o.id;
+      if (i === 0) input.checked = true;
+      const check = document.createElement('span');
+      check.className = 'homey-form-radio-checkmark';
+      const text = document.createElement('span');
+      text.className = 'homey-form-radio-text';
+      text.textContent = `${o.label} — ${o.models}`;
+      label.append(input, check, text);
+      box.append(label);
+    });
+  }).catch((err) => Homey.alert(err.message || String(err), 'error'));
+
+  $('next').addEventListener('click', () => {
+    const sel = document.querySelector('input[name="operator"]:checked');
+    chosen = operators.find((o) => o.id === (sel && sel.value));
+    if (!chosen) return;
+    $('chosen').textContent = `${chosen.label} — ${chosen.models}`;
+    $('host').value = chosen.host;
+    $('password').value = '';
+    $('password-group').style.display = chosen.password === 'none' ? 'none' : '';
+    $('password-hint').textContent = Homey.__(`pair.password_hint_${chosen.id}`);
+    $('step-operator').style.display = 'none';
+    $('step-connect').style.display = '';
+  });
+
+  $('back').addEventListener('click', () => {
+    $('step-connect').style.display = 'none';
+    $('step-operator').style.display = '';
+  });
+
+  $('connect').addEventListener('click', async () => {
+    const btn = $('connect');
+    btn.classList.add('is-loading');
+    btn.disabled = true;
+    $('status').textContent = Homey.__('pair.connecting');
+    try {
+      const device = await Homey.emit('test', { operator: chosen.id, host: $('host').value, password: $('password').value });
+      $('status').textContent = `${Homey.__('pair.found')} ${device.name}`;
+      await Homey.createDevice(device);
+      Homey.done();
+    } catch (err) {
+      $('status').textContent = '';
+      Homey.alert(err.message || String(err), 'error');
+    } finally {
+      btn.classList.remove('is-loading');
+      btn.disabled = false;
+    }
+  });
+</script>

@@ -1,0 +1,95 @@
+<header class="homey-header">
+  <h1 class="homey-title">TP-Link Deco</h1>
+  <p class="homey-subtitle" id="subtitle"></p>
+</header>
+
+<form class="homey-form" id="login-form" onsubmit="return false;">
+  <div class="homey-form-group">
+    <label class="homey-form-label" for="host" id="host-label"></label>
+    <input class="homey-form-input" id="host" type="text" inputmode="url" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="192.168.68.1" autocomplete="off" />
+    <p class="homey-form-hint" id="host-hint"></p>
+  </div>
+  <div class="homey-form-group">
+    <label class="homey-form-label" for="password" id="password-label"></label>
+    <input class="homey-form-input" id="password" type="password" autocomplete="off" />
+    <p class="homey-form-hint" id="password-hint"></p>
+  </div>
+  <p id="status" style="min-height:1.5em;"></p>
+  <button class="homey-button-primary-full" id="connect"></button>
+</form>
+
+<form class="homey-form" id="nodes-form" style="display:none;" onsubmit="return false;">
+  <fieldset class="homey-form-fieldset">
+    <legend class="homey-form-legend" id="nodes-legend"></legend>
+    <div id="nodes"></div>
+  </fieldset>
+  <button class="homey-button-primary-full" id="add"></button>
+</form>
+
+<script type="application/javascript">
+  const $ = (id) => document.getElementById(id);
+  const t = {
+    subtitle: 'pair.deco_subtitle', 'host-label': 'pair.host', 'host-hint': 'pair.deco_host_hint',
+    'password-label': 'pair.password', 'password-hint': 'pair.deco_password_hint', connect: 'pair.button',
+    'nodes-legend': 'pair.nodes', add: 'pair.add',
+  };
+  for (const [id, key] of Object.entries(t)) $(id).textContent = Homey.__(key);
+
+  let found = [];
+
+  $('connect').addEventListener('click', async () => {
+    const btn = $('connect');
+    btn.classList.add('is-loading');
+    btn.disabled = true;
+    $('status').textContent = Homey.__('pair.connecting');
+    try {
+      found = await Homey.emit('login', { host: $('host').value, password: $('password').value });
+      const box = $('nodes');
+      box.innerHTML = '';
+      found.forEach((n, i) => {
+        const label = document.createElement('label');
+        label.className = 'homey-form-checkbox';
+        const input = document.createElement('input');
+        input.className = 'homey-form-checkbox-input';
+        input.type = 'checkbox';
+        input.id = `node-${i}`;
+        input.checked = !n.paired;
+        input.disabled = n.paired;
+        const check = document.createElement('span');
+        check.className = 'homey-form-checkbox-checkmark';
+        const text = document.createElement('span');
+        text.className = 'homey-form-checkbox-text';
+        text.textContent = `${n.device.name}${n.master ? ` (${Homey.__('pair.main')})` : ''}${n.paired ? ` – ${Homey.__('pair.already')}` : ''}`;
+        label.append(input, check, text);
+        box.append(label);
+      });
+      $('login-form').style.display = 'none';
+      $('nodes-form').style.display = '';
+    } catch (err) {
+      $('status').textContent = '';
+      Homey.alert(err.message || String(err), 'error');
+    } finally {
+      btn.classList.remove('is-loading');
+      btn.disabled = false;
+    }
+  });
+
+  $('add').addEventListener('click', async () => {
+    const btn = $('add');
+    const selected = found.filter((n, i) => !n.paired && $(`node-${i}`).checked);
+    if (!selected.length) {
+      Homey.alert(Homey.__('pair.none_selected'), 'info');
+      return;
+    }
+    btn.classList.add('is-loading');
+    btn.disabled = true;
+    try {
+      for (const n of selected) await Homey.createDevice(n.device);
+      Homey.done();
+    } catch (err) {
+      Homey.alert(err.message || String(err), 'error');
+      btn.classList.remove('is-loading');
+      btn.disabled = false;
+    }
+  });
+</script>
