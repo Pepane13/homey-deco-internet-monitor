@@ -1,4 +1,8 @@
 {
+  "1.0.1": {
+    "en": "Corrected jitter measurement (computed per target, no more false alerts) and updated app description.",
+    "fr": "Mesure de la gigue corrigée (calculée par cible, plus de fausses alertes) et description de l'app mise à jour."
+  },
   "1.0.0": {
     "en": "First release: Internet quality (probes, speed test by the Livebox or from Homey, outages, threshold alerts), Internet box (Orange / Sosh Livebox, Bouygues Bbox, SFR Box) and TP-Link Deco (one device per node, clients, traffic and average traffic, backhaul).",
     "fr": "Première version : qualité Internet (sondes, test de débit par la Livebox ou depuis la Homey, coupures, alertes de seuil), box Internet (Livebox Orange / Sosh, Bbox Bouygues, SFR Box) et TP-Link Deco (un appareil par module, clients, trafic et débit moyen, liaison)."
