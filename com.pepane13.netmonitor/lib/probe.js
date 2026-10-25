@@ -57,7 +57,6 @@ function jitter(values) {
  * @returns {Promise<{online:boolean, latency:number|null, jitter:number|null, loss:number, reachable:number, total:number, perTarget:object[]}>}
  */
 async function probeRound(targets, { samples = 3, timeout = 3000, connect = tcpConnectTime } = {}) {
-  const all = [];
   const perTarget = [];
   let attempts = 0;
   let failures = 0;
@@ -73,8 +72,7 @@ async function probeRound(targets, { samples = 3, timeout = 3000, connect = tcpC
         lastError = e.code || e.message;
       }
     }
-    perTarget.push({ target: `${t.host}:${t.port}`, ok: times.length > 0, latency: median(times), error: times.length ? null : lastError });
-    all.push(...times);
+    perTarget.push({ target: `${t.host}:${t.port}`, ok: times.length > 0, latency: median(times), jitter: times.length > 1 ? jitter(times) : null, error: times.length ? null : lastError });
   }
   const reachable = perTarget.filter((p) => p.ok).length;
   const best = perTarget.filter((p) => p.ok).map((p) => p.latency);
@@ -82,7 +80,8 @@ async function probeRound(targets, { samples = 3, timeout = 3000, connect = tcpC
     online: reachable > 0,
     // Median of the per-target medians: robust to one slow anycast node
     latency: best.length ? median(best) : null,
-    jitter: all.length > 1 ? jitter(all) : null,
+    // Jitter is computed per target (samples to different servers are not comparable), then the median
+    jitter: median(perTarget.map((p) => p.jitter).filter((j) => j != null)),
     loss: attempts ? (failures / attempts) * 100 : 100,
     reachable,
     total: targets.length,

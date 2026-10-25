@@ -1,6 +1,6 @@
 {
   "1.0.0": {
-    "en": "First release: Internet quality (probes, speed test, outages, threshold alerts), Orange Livebox 5 and TP-Link Deco.",
-    "fr": "Première version : qualité Internet (sondes, test de débit, coupures, alertes de seuil), Orange Livebox 5 et TP-Link Deco."
+    "en": "First release: Internet quality (probes, speed test by the Livebox or from Homey, outages, threshold alerts), Internet box (Orange / Sosh Livebox, Bouygues Bbox, SFR Box) and TP-Link Deco (one device per node, clients, traffic and average traffic, backhaul).",
+    "fr": "Première version : qualité Internet (sondes, test de débit par la Livebox ou depuis la Homey, coupures, alertes de seuil), box Internet (Livebox Orange / Sosh, Bbox Bouygues, SFR Box) et TP-Link Deco (un appareil par module, clients, trafic et débit moyen, liaison)."
   }
 }

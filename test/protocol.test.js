@@ -230,6 +230,13 @@ async function test(name, fn) {
     srv.close();
   });
 
+  await test('jitter computed per target, not across targets with different latencies', async () => {
+    const lat = { a: [5, 5, 5], b: [60, 60, 60] };
+    const r = await probeRound(parseTargets('a:1, b:1'), { samples: 3, connect: async (h) => lat[h].shift() });
+    assert.strictEqual(r.jitter, 0);
+    assert.strictEqual(r.latency, 32.5);
+  });
+
   await test('target parsing', async () => {
     assert.deepStrictEqual(parseTargets('1.1.1.1:443; dns.google, 9.9.9.9:53'), [
       { host: '1.1.1.1', port: 443 }, { host: 'dns.google', port: 443 }, { host: '9.9.9.9', port: 53 }]);
