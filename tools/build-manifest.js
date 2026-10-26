@@ -53,6 +53,7 @@ const capabilities = {
   netmon_signal: num(t('Backhaul signal', 'Signal de liaison'), null, 0, 'wifi', { chartType: 'stepLine' }),
   netmon_speed: num(t('Backhaul speed', 'Débit de liaison'), 'Mbit/s', 0, 'wifi'),
   netmon_load: num(t('Load', 'Charge'), '%', 0, 'cpu'),
+  netmon_quality: num(t('Link quality', 'Qualité de la liaison'), '%', 0, 'fiber', { min: 0, max: 100 }),
 };
 for (const c of Object.values(capabilities)) if (c.units === undefined) delete c.units;
 
@@ -150,7 +151,8 @@ const drivers = [
     name: t('Internet box', 'Box Internet'),
     class: 'sensor',
     capabilities: [
-      'netmon_online', 'netmon_power.rx', 'netmon_power.tx', 'netmon_throughput.down', 'netmon_throughput.up',
+      'netmon_online', 'netmon_quality', 'netmon_power.rx', 'netmon_power.tx', 'netmon_throughput.down', 'netmon_throughput.up',
+      'netmon_download.box', 'netmon_upload.box', 'netmon_latency.box',
       'netmon_uptime.wan', 'netmon_uptime.box', 'netmon_ip', 'netmon_text',
     ],
     capabilitiesOptions: {
@@ -162,6 +164,10 @@ const drivers = [
       'netmon_uptime.wan': opt(t('Internet connection uptime', 'Durée de la connexion Internet')),
       'netmon_uptime.box': opt(t('Box uptime', 'Durée de fonctionnement de la box')),
       netmon_text: opt(t('Line state', 'État de la ligne')),
+      netmon_quality: opt(t('Internet link quality', 'Qualité de la liaison Internet')),
+      'netmon_download.box': opt(t('Download (box speed test)', 'Débit descendant (test de la box)')),
+      'netmon_upload.box': opt(t('Upload (box speed test)', 'Débit montant (test de la box)')),
+      'netmon_latency.box': opt(t('Latency (box speed test)', 'Latence (test de la box)')),
     },
     platforms: ['local'],
     connectivity: ['lan'],
@@ -209,8 +215,10 @@ const drivers = [
     id: 'deco',
     name: t('Deco node', 'Module Deco'),
     class: 'sensor',
-    capabilities: ['netmon_rate', 'netmon_online', 'netmon_clients', 'netmon_throughput.down', 'netmon_throughput.up', 'netmon_text'],
+    capabilities: ['netmon_rate', 'netmon_online', 'netmon_clients', 'netmon_latency', 'netmon_jitter', 'netmon_throughput.down', 'netmon_throughput.up', 'netmon_text'],
     capabilitiesOptions: {
+      netmon_latency: opt(t('Latency from Homey (Wi-Fi mesh)', 'Latence depuis Homey (maillage Wi-Fi)')),
+      netmon_jitter: opt(t('Jitter from Homey', 'Gigue depuis Homey')),
       netmon_online: opt(t('Online', 'En ligne')),
       netmon_text: opt(t('Backhaul', 'Liaison')),
       'netmon_throughput.down': opt(t('Download traffic (clients)', 'Trafic descendant (clients)')),
@@ -246,6 +254,16 @@ const drivers = [
           numberSetting('min_signal', t('Minimum backhaul signal', 'Signal de liaison minimum'), 2, 0, 4, null,
             t('Wireless satellites only. Signal level reported by the Deco (0 = none to 4 = excellent).', 'Satellites sans fil uniquement. Niveau de signal donné par le Deco (0 = nul à 4 = excellent).')),
           numberSetting('min_speed', t('Minimum backhaul speed', 'Débit de liaison minimum'), 150, 0, 5000, 'Mbit/s', t('0 = no alert.', '0 = pas d\'alerte.')),
+        ],
+      },
+      {
+        type: 'group', label: t('Latency', 'Latence'), children: [
+          numberSetting('max_latency', t('Latency warning above', 'Avertissement de latence au-delà de'), 50, 0, 2000, 'ms',
+            t('Latency from Homey to this Deco, measured every poll (5 samples). For a satellite it includes the mesh backhaul. Above this value a warning is written to the diagnostic log. 0 = no warning.',
+              'Latence entre la Homey et ce Deco, mesurée à chaque interrogation (5 mesures). Pour un satellite, elle inclut la liaison maillée. Au-delà de cette valeur, un avertissement est écrit dans le journal de diagnostic. 0 = pas d\'avertissement.')),
+          numberSetting('latency_port', t('Measurement port', 'Port de mesure'), 80, 1, 65535, null,
+            t('TCP port used for the measurement. An open or a closed port both answer: change it only if the Deco does not answer on 80.',
+              'Port TCP utilisé pour la mesure. Un port ouvert ou fermé répond dans les deux cas : à changer seulement si le Deco ne répond pas sur le 80.')),
         ],
       },
       {
@@ -368,6 +386,12 @@ const manifest = {
   drivers,
   capabilities,
   flow,
+  api: {
+    getLog: { method: 'GET', path: '/log' },
+    clearLog: { method: 'DELETE', path: '/log' },
+    getStatus: { method: 'GET', path: '/status' },
+    getReport: { method: 'GET', path: '/report' },
+  },
 };
 
 fs.writeFileSync(path.join(APP, 'app.json'), `${JSON.stringify(manifest, null, 2)}\n`);

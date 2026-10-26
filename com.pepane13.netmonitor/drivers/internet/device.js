@@ -4,6 +4,9 @@ const Homey = require('homey');
 const { probeRound, parseTargets, tcpConnectTime, dnsTime } = require('../../lib/probe');
 const { runSpeedtest } = require('../../lib/speedtest');
 const { OutageTracker, ThresholdWatch } = require('../../lib/monitor');
+const { DayStats, dayKey, timeOf } = require('../../lib/quality');
+
+const RATE_LIMIT_MIN = 30; // same warning at most once per 30 min
 
 const round1 = (v) => (v == null ? null : Math.round(v * 10) / 10);
 
@@ -26,7 +29,14 @@ module.exports = class InternetDevice extends Homey.Device {
     this.tracker = new OutageTracker({ confirm: this.getSetting('confirm_rounds') || 2, state: this.getStoreValue('outages') || undefined });
     this.watch = new ThresholdWatch(this._rules(), this.getSetting('consecutive') || 2, this.getStoreValue('watch') || undefined);
     await this._ensureCapabilities();
+    this.stats = new DayStats(this.getStoreValue('day_stats') || undefined);
+    this.stats.roll(this._today());
+    this.lastRound = null;
+    this.lastError = null;
+    this.onceAt = {};
+    this.rounds = 0;
     if (this.getCapabilityValue('netmon_status') == null) await this._set('netmon_status', 'unknown');
+    this._diag('info', 'app', `${this._t('diag.device_started')} (${this._t('diag.probes_every', { s: Number(this.getSetting('probe_interval')) || 30 })})`);
     this._scheduleProbe(2000);
     this._scheduleSpeedtest(true);
     this.log('Internet quality device ready');
@@ -67,6 +77,7 @@ module.exports = class InternetDevice extends Homey.Device {
   }
 
   async onSettings({ changedKeys }) {
+    this._diag('info', 'app', this._t('diag.settings_changed', { keys: changedKeys.join(', ') }));
     this.tracker.confirm = Number(this.getSetting('confirm_rounds')) || 2;
     this.watch.setRules(this._rules(), Number(this.getSetting('consecutive')) || 2);
     // Thresholds changed: clear the alert state of the affected metrics so they are re-evaluated
@@ -84,6 +95,7 @@ module.exports = class InternetDevice extends Homey.Device {
   }
 
   onUninit() {
+    this.setStoreValue('day_stats', this.stats.toJSON()).catch(() => {});
     if (this.probeTimer) this.homey.clearTimeout(this.probeTimer);
     if (this.speedTimer) this.homey.clearTimeout(this.speedTimer);
     this.probeTimer = null;
@@ -101,7 +113,59 @@ module.exports = class InternetDevice extends Homey.Device {
   }
 
   _time(ts) {
-    return new Date(ts).toLocaleTimeString('fr-FR', { timeZone: this.homey.clock.getTimezone(), hour: '2-digit', minute: '2-digit' });
+    return timeOf(ts, this.homey.clock.getTimezone());
+  }
+
+  _today(ts = Date.now()) {
+    return dayKey(ts, this.homey.clock.getTimezone());
+  }
+
+  /** Translated message with {var} placeholders replaced. */
+  _t(key, vars = {}) {
+    let s = this.homey.__(key);
+    if (typeof s !== 'string') s = key;
+    return s.replace(/\{(\w+)\}/g, (m, k) => (vars[k] !== undefined && vars[k] !== null ? String(vars[k]) : m));
+  }
+
+  _diag(level, category, message) {
+    const app = this.homey.app;
+    if (app && typeof app.logDiag === 'function') app.logDiag(level, this.getName(), category, message);
+  }
+
+  /** Logs a message at most once per `minutes` for the same key. Returns true when logged. */
+  _diagOnce(key, minutes, level, category, message) {
+    const now = Date.now();
+    if (this.onceAt[key] && now - this.onceAt[key] < minutes * 60000) return false;
+    this.onceAt[key] = now;
+    this._diag(level, category, message);
+    return true;
+  }
+
+  _notify(key, message) {
+    const app = this.homey.app;
+    return app && typeof app.notify === 'function' ? app.notify(key, message) : Promise.resolve(false);
+  }
+
+  /** Daily summary of the finished day, logged at the first probe of the new day. */
+  _rollDay(ts) {
+    const done = this.stats.roll(this._today(ts));
+    if (!done) return;
+    const d = new DayStats(done);
+    const v = (m, k) => { const x = d.get(m); return x ? x[k] : '—'; };
+    const c = done.counters || {};
+    const speeds = (done.events || []).filter((e) => e.startsWith('speed ')).map((e) => e.slice(6));
+    this._diag('info', 'day', this._t('diag.summary', {
+      day: done.day,
+      rounds: c.rounds || 0,
+      outages: c.outages || 0,
+      downtime: Math.round((c.downtime || 0) / 60),
+      lavg: v('latency', 'avg'), lmax: v('latency', 'max'), lmaxAt: d.get('latency') ? this._time(d.get('latency').maxAt) : '—',
+      javg: v('jitter', 'avg'), jmax: v('jitter', 'max'),
+      gavg: v('lan', 'avg'), gmax: v('lan', 'max'),
+      lossRounds: c.loss_rounds || 0,
+      alerts: c.alerts || 0,
+      tests: speeds.length ? speeds.join(' ; ') : '—',
+    }));
   }
 
   // ------------------------------------------------------------------ probes
@@ -119,10 +183,13 @@ module.exports = class InternetDevice extends Homey.Device {
   }
 
   async probe() {
+    const now = Date.now();
+    this._rollDay(now);
     const targets = parseTargets(this.getSetting('probe_targets') || '1.1.1.1:443, 8.8.8.8:443, 9.9.9.9:443');
     const r = await probeRound(targets, { samples: 3, timeout: 3000 });
 
     let gatewayOk = null;
+    let lanLatency = null;
     let gwSetting = this.getSetting('gateway') || '';
     if (gwSetting === '192.168.1.1:80') {
       // Default value: follow the address of the paired box (e.g. a Bbox answers on 192.168.1.254)
@@ -135,18 +202,42 @@ module.exports = class InternetDevice extends Homey.Device {
     const gw = parseTargets(gwSetting, 80)[0];
     if (gw) {
       try {
-        await this._set('netmon_latency.gateway', round1(await tcpConnectTime(gw.host, gw.port, 2000)));
+        lanLatency = await tcpConnectTime(gw.host, gw.port, 2000);
+        await this._set('netmon_latency.gateway', round1(lanLatency));
         gatewayOk = true;
       } catch (e) {
         await this._set('netmon_latency.gateway', null);
         gatewayOk = false;
       }
     }
+    let dns = null;
     try {
-      await this._set('netmon_dns', Math.round(await dnsTime('www.google.com', 3000)));
+      dns = await dnsTime('www.google.com', 3000);
+      await this._set('netmon_dns', Math.round(dns));
     } catch (e) {
       await this._set('netmon_dns', null);
+      this._diagOnce('dns', RATE_LIMIT_MIN, 'warn', 'internet', this._t('diag.dns_failed', { error: e.code || e.message }));
     }
+    this.lastRound = { t: new Date(now).toISOString(), ...r, lan: lanLatency, dns, speedRunning: !!this.speedRunning };
+    this.rounds++;
+    this.stats.count('rounds');
+    if (r.online && !this.speedRunning) {
+      this.stats.add('latency', r.latency, now);
+      this.stats.add('jitter', r.jitter, now);
+    }
+    this.stats.add('lan', lanLatency, now);
+    if (r.loss > 0) this.stats.count('loss_rounds');
+    const per = (r.perTarget || []).map((t) => `${t.target} ${t.ok ? `${round1(t.latency)} ms` : (t.error || 'KO')}`).join(', ');
+    this._diag('debug', 'internet', this._t('diag.round', {
+      latency: round1(r.latency) ?? '—', jitter: round1(r.jitter) ?? '—', loss: Math.round(r.loss), lan: round1(lanLatency) ?? '—', dns: dns == null ? '—' : Math.round(dns), targets: per,
+    }) + (this.speedRunning ? ` ${this._t('diag.during_speedtest')}` : ''));
+    if (r.online && r.reachable < r.total) {
+      this._diagOnce('partial', RATE_LIMIT_MIN, 'info', 'internet', this._t('diag.partial', { ok: r.reachable, total: r.total, targets: per }));
+    }
+    if (gatewayOk === false) {
+      this._diagOnce('lan_down', RATE_LIMIT_MIN, 'warn', 'internet', this._t('diag.lan_unreachable', { target: gwSetting }));
+    }
+    if (this.rounds % 10 === 0) await this.setStoreValue('day_stats', this.stats.toJSON());
 
     await this._set('netmon_online', r.online);
     await this._set('netmon_latency', round1(r.latency));
@@ -157,9 +248,19 @@ module.exports = class InternetDevice extends Homey.Device {
     if (ev && ev.type === 'down') {
       const cause = gatewayOk === false ? 'lan' : 'internet';
       this.log(`Internet down since ${new Date(ev.since).toISOString()} (cause: ${cause})`, JSON.stringify(r.perTarget));
+      const msg = this.homey.__(cause === 'lan' ? 'diag.down_lan' : 'diag.down_internet', { since: this._time(ev.since), targets: per });
+      this.lastError = { t: new Date(now).toISOString(), text: msg };
+      this.stats.count('outages');
+      this.stats.event(`down ${this._time(ev.since)}`);
+      this._diag('error', 'internet', msg);
+      await this._notify('notify_internet', msg);
       await this._trigger('internet_down', { since: this._time(ev.since), cause });
     } else if (ev && ev.type === 'up') {
       this.log(`Internet restored after ${ev.duration} s`);
+      const msg = this._t('diag.restored', { duration: formatDuration(ev.duration), since: this._time(ev.since) });
+      this.stats.count('downtime', ev.duration);
+      this._diag('warn', 'internet', msg);
+      await this._notify('notify_internet', msg);
       await this._trigger('internet_restored', { duration: ev.duration, duration_text: formatDuration(ev.duration), since: this._time(ev.since) });
     }
     await this._set('netmon_outages', this.tracker.count);
@@ -168,19 +269,44 @@ module.exports = class InternetDevice extends Homey.Device {
 
     // A running speed test saturates the line (bufferbloat): latency samples are not representative
     if (r.online && !this.speedRunning) {
-      await this._evaluate('latency', r.latency);
-      await this._evaluate('jitter', r.jitter);
-      await this._evaluate('loss', r.loss);
+      const ctx = { lan: lanLatency };
+      await this._evaluate('latency', r.latency, ctx);
+      await this._evaluate('jitter', r.jitter, ctx);
+      await this._evaluate('loss', r.loss, ctx);
     }
     await this._refreshStatus();
     return r;
   }
 
-  async _evaluate(metric, value) {
+  /**
+   * Probable location of a latency / jitter / loss problem: when the latency to the box rises too,
+   * the delay builds up before the Internet (box busy or local network loaded).
+   */
+  _causeHint(metric, ctx) {
+    if (!ctx || !['latency', 'jitter', 'loss'].includes(metric)) return '';
+    const lan = this.stats.get('lan');
+    const usual = lan ? lan.avg : null;
+    if (ctx.lan == null) return '';
+    if (ctx.lan >= 20 && (usual == null || ctx.lan > usual * 2)) return this._t('diag.hint_local', { lan: round1(ctx.lan) });
+    return this._t('diag.hint_internet', { lan: round1(ctx.lan) });
+  }
+
+  async _evaluate(metric, value, ctx) {
     const ev = this.watch.update(metric, value);
     if (!ev) return;
     const label = this.homey.__(`metric.${metric}`);
     this.log(`Quality ${ev.type}: ${metric}=${value} (limit ${ev.limit})`);
+    const unit = ['download', 'upload'].includes(metric) ? 'Mbit/s' : metric === 'loss' ? '%' : 'ms';
+    if (ev.type === 'degraded') {
+      const msg = `${this._t('diag.degraded', { metric: label, value: round1(value), unit, limit: ev.limit, n: this.watch.consecutive })} ${this._causeHint(metric, ctx)}`.trim();
+      this.stats.count('alerts');
+      this.stats.event(`alert ${metric} ${this._time(Date.now())}`);
+      this._diag('warn', ['download', 'upload'].includes(metric) ? 'speed' : 'internet', msg);
+      await this._notify('notify_quality', msg);
+    } else {
+      this._diag('info', ['download', 'upload'].includes(metric) ? 'speed' : 'internet',
+        this._t('diag.recovered', { metric: label, value: round1(value), unit }));
+    }
     if (ev.type === 'degraded') await this._trigger('quality_degraded', { metric: label, value: round1(value), limit: ev.limit });
     else await this._trigger('quality_recovered', { metric: label, value: round1(value) });
     await this.setStoreValue('watch', this.watch.state);
@@ -263,6 +389,7 @@ module.exports = class InternetDevice extends Homey.Device {
     } catch (e) {
       if (source === 'livebox') throw e;
       this.log('Livebox speed test failed, falling back to Homey:', e.message);
+      this._diag('info', 'speed', this._t('diag.speed_fallback', { error: e.message }));
       return fromHomey();
     }
   }
@@ -276,10 +403,17 @@ module.exports = class InternetDevice extends Homey.Device {
       r = await this._speedtestBySource();
     } catch (e) {
       this.log('Speed test failed:', e.message);
+      this.lastError = { t: new Date().toISOString(), text: `speed test: ${e.message}` };
+      this._diag('warn', 'speed', this._t('diag.speed_failed', { error: e.message }));
       await this._trigger('speedtest_failed', { error: e.message });
       throw e;
     }
-    this.log(`Speed test (${r.source}): ${r.download} / ${r.upload} Mbit/s, ${r.latency} ms in ${Math.round((Date.now() - started) / 1000)} s (${r.server})`);
+    const secs = Math.round((Date.now() - started) / 1000);
+    this.log(`Speed test (${r.source}): ${r.download} / ${r.upload} Mbit/s, ${r.latency} ms in ${secs} s (${r.server})`);
+    this._diag('info', 'speed', this._t('diag.speed_done', {
+      source: this.homey.__(`diag.source_${r.source === 'homey' ? 'homey' : 'box'}`), down: r.download, up: r.upload, latency: r.latency ?? '—', secs,
+    }));
+    this.stats.event(`speed ${this._time(Date.now())} ${r.download}/${r.upload} (${r.source})`);
     await this._set('netmon_download', r.download);
     await this._set('netmon_upload', r.upload);
     await this._set('netmon_latency.speedtest', r.latency);
@@ -297,5 +431,35 @@ module.exports = class InternetDevice extends Homey.Device {
     await this._evaluate('upload', r.upload);
     await this._refreshStatus();
     return r;
+  }
+
+  // ------------------------------------------------------------------ diagnostics (settings page)
+
+  getDiagStatus() {
+    const day = (m) => this.stats.get(m);
+    const st = this.getStoreValue('speedtest');
+    return {
+      driver: 'internet',
+      id: this.getData().id,
+      name: this.getName(),
+      kind: 'internet',
+      status: this.getCapabilityValue('netmon_status'),
+      online: this.tracker.online,
+      lastRound: this.lastRound,
+      today: {
+        latency: day('latency'), jitter: day('jitter'), lan: day('lan'),
+        outages: this.tracker.count, downtimeMin: round1(this.tracker.downtimeToday() / 60),
+        alerts: this.stats.counters.alerts || 0,
+      },
+      degraded: this.watch.degraded(),
+      lastSpeedtest: st ? { ...st, t: new Date(st.ts).toISOString() } : null,
+      lastError: this.lastError,
+    };
+  }
+
+  getDiagReport() {
+    const values = {};
+    for (const c of this.getCapabilities()) values[c] = this.getCapabilityValue(c);
+    return { driver: 'internet', name: this.getName(), status: this.getDiagStatus(), settings: this.getSettings(), values };
   }
 };

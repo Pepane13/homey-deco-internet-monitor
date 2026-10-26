@@ -6,4 +6,6 @@ Internet box, choose your provider before pairing: Orange and Sosh (Livebox 4, 5
 
 TP-Link Deco: one device per node, online state, connected clients (per node and per band on the main Deco), download and upload traffic of each node's clients, an "Average traffic" indicator to show on the tile, CPU and memory load, wireless backhaul signal and speed. Each node's settings show its IP address, role, MAC address, model and firmware. Flows when a node goes offline, when the backhaul weakens, and when a device connects or disconnects.
 
+Diagnostics: app settings page with the status of every device, a diagnostic log (four levels, copy, report export), switchable notifications and a daily summary. Insights curves of the Internet link quality (%), of the box speed tests and of the latency from Homey to every Deco.
+
 Requirements: Homey Pro. Box administration password if the box asks for one. Deco owner account password (the Deco refuses manager accounts; each login closes the owner session of the Deco app, so use a manager account in the app). Speed tests run from Homey Pro (Early 2023) cannot exceed about 94 Mbit/s (100 Mbit/s Ethernet port); the Livebox test has no such limit.

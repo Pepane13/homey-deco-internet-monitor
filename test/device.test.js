@@ -22,7 +22,9 @@ const probe = require(`${APP}/lib/probe`);
 const speed = require(`${APP}/lib/speedtest`);
 const stub = { online: true, latency: 6, jitter: 1, loss: 0, gateway: true, speed: { download: 93.4, upload: 91.8, latency: 5.2, jitter: 0.4, server: 'MRS', bytes: 2e8 } };
 probe.probeRound = async () => ({ online: stub.online, latency: stub.online ? stub.latency : null, jitter: stub.online ? stub.jitter : null, loss: stub.online ? stub.loss : 100, reachable: stub.online ? 3 : 0, total: 3, perTarget: [] });
-probe.tcpConnectTime = async () => { if (!stub.gateway) throw new Error('down'); return 0.8; };
+probe.tcpConnectTime = async () => { if (!stub.gateway) throw new Error('down'); return stub.gwMs ?? 0.8; };
+probe.rttSeries = async () => ({ ...stub.rtt });
+stub.rtt = { latency: 3.2, jitter: 0.5, loss: 0, max: 4.1, error: null };
 probe.dnsTime = async () => 12;
 speed.runSpeedtest = async () => ({ ...stub.speed });
 
@@ -80,6 +82,13 @@ const clear = () => trig.splice(0);
   });
 
   // ------------------------------------------------------------------ Internet device
+  // The app (diagnostic log, notifications) is created first, as on Homey
+  const App = require(`${APP}/app.js`);
+  const app = new App();
+  await app.onInit();
+  homey.app = app;
+  const logged = (re, level) => app.diag.get('debug').filter((e) => re.test(e.m) && (!level || e.l === level));
+
   console.log('Internet quality device');
   const InternetDevice = require(`${APP}/drivers/internet/device.js`);
   const settings = {};
@@ -229,6 +238,53 @@ const clear = () => trig.splice(0);
     clear();
   });
 
+  await test('diagnostic log: outage as error + notification, restore as warning', async () => {
+    homey.notes.length = 0;
+    stub.online = false;
+    await inet.probe(); await inet.probe();
+    assert.strictEqual(logged(/^Internet down since/, 'error').length >= 1, true);
+    assert.ok(homey.notes.some((n) => /^Internet down since/.test(n)));
+    stub.online = true;
+    await inet.probe();
+    assert.ok(logged(/^Internet back after/, 'warn').length >= 1);
+    assert.ok(homey.notes.some((n) => /^Internet back after/.test(n)));
+    clear();
+  });
+
+  await test('latency alert with a slow box is attributed to the local side; not notified by default', async () => {
+    homey.notes.length = 0;
+    const n0 = logged(/^Quality degraded: Latency 48 ms/, 'warn').length;
+    stub.latency = 48; stub.gwMs = 45;
+    await inet.probe(); await inet.probe();
+    const d = logged(/^Quality degraded: Latency 48 ms/, 'warn').slice(n0);
+    assert.strictEqual(d.length, 1);
+    assert.ok(/Latency to the box is high too \(45 ms\)/.test(d[0].m), d[0].m);
+    assert.ok(!homey.notes.some((n) => /Quality degraded/.test(n)), 'quality alerts are off by default');
+    stub.latency = 6; stub.gwMs = 0.8;
+    await inet.probe(); await inet.probe();
+    assert.ok(logged(/^Latency back to normal/, 'info').length >= 1);
+    clear();
+  });
+
+  await test('daily summary logged at the first probe of a new day', async () => {
+    inet.stats.roll('2000-01-01');
+    inet.stats.add('latency', 12); inet.stats.add('latency', 30); inet.stats.count('alerts');
+    await inet.probe();
+    const sm = logged(/^Summary of 2000-01-01/, 'info');
+    assert.strictEqual(sm.length, 1);
+    assert.ok(/average latency 21 ms \(max 30 ms/.test(sm[0].m), sm[0].m);
+    assert.ok(/alerts 1/.test(sm[0].m));
+    clear();
+  });
+
+  await test('settings page status of the Internet device', async () => {
+    const st = inet.getDiagStatus();
+    assert.strictEqual(st.kind, 'internet');
+    assert.strictEqual(st.lastRound && st.lastRound.latency, stub.latency, JSON.stringify(st.lastRound));
+    assert.ok(st.today.latency);
+    clear();
+  });
+
   // ------------------------------------------------------------------ Livebox device
   console.log('Livebox device');
   const lb = fakeLivebox({ password: 'secret' });
@@ -277,6 +333,49 @@ const clear = () => trig.splice(0);
     await box.poll();
     assert.strictEqual(fired('fiber_signal_ok').length, 1);
     clear();
+  });
+
+  await test('Internet link quality score (fibre + probes) as an Insights curve', async () => {
+    homey.registry.internet = [inet];
+    box.quality = null;
+    await box.poll();
+    assert.ok(box.caps.netmon_quality >= 90, `quality ${box.caps.netmon_quality} ${JSON.stringify(box.qualityParts)} ${JSON.stringify(box._probeValues())}`);
+    inet.caps.netmon_latency = 150; inet.caps.netmon_jitter = 60; inet.caps.netmon_loss = 20;
+    box.quality = null;
+    await box.poll();
+    assert.ok(box.caps.netmon_quality < 50, `quality ${box.caps.netmon_quality}`);
+    assert.ok(logged(/^Poor Internet link quality/, 'warn').length >= 1);
+    inet.caps.netmon_latency = 6; inet.caps.netmon_jitter = 1; inet.caps.netmon_loss = 0;
+    homey.registry.internet = [];
+  });
+
+  await test('box speed test stored as separate box curves', async () => {
+    const real = box.client.runSpeedtest.bind(box.client);
+    box.client.runSpeedtest = () => real({ pollS: 0, sleep: async () => {} });
+    const r = await box.runSpeedtest();
+    assert.strictEqual(r.download, 912.3);
+    assert.strictEqual(box.caps['netmon_download.box'], 912.3);
+    assert.strictEqual(box.caps['netmon_upload.box'], 701.2);
+    assert.strictEqual(box.caps['netmon_latency.box'], 4);
+    assert.ok(logged(/^Box speed test: 912.3 Mbit\/s down/, 'info').length === 1);
+  });
+
+  await test('impossible traffic (above the measured line capacity) or counter reset is discarded', async () => {
+    await box.pollCounters();
+    const before = box.caps['netmon_throughput.down'];
+    lb.st.rx += 2e9; // 1600 Mbit/s over 10 s on a 912 Mbit/s line
+    box.lastCounters.ts -= 10000;
+    await box.pollCounters();
+    assert.strictEqual(box.caps['netmon_throughput.down'], before);
+    assert.ok(logged(/^Traffic sample discarded/).length >= 1);
+    lb.st.rx = 1000; // counter reset (reboot), far from the 32-bit limit: not a wrap
+    box.lastCounters.ts -= 10000;
+    await box.pollCounters();
+    assert.strictEqual(box.caps['netmon_throughput.down'], before);
+    lb.st.rx += 12.5e6;
+    box.lastCounters.ts -= 10000;
+    await box.pollCounters();
+    assert.ok(Math.abs(box.caps['netmon_throughput.down'] - 10) < 1);
   });
 
   await test('wrong password -> unavailable with explicit message', async () => {
@@ -332,10 +431,6 @@ const clear = () => trig.splice(0);
   console.log('Deco devices (shared session)');
   const dc = fakeDeco({ password: 'owner-pass' });
   const dcHost = await dc.start();
-  const App = require(`${APP}/app.js`);
-  const app = new App();
-  await app.onInit();
-  homey.app = app;
   const DecoDevice = require(`${APP}/drivers/deco/device.js`);
   const dset = { host: dcHost, password: 'owner-pass', poll_interval: 60, min_signal: 2, min_speed: 150 };
   const master = new DecoDevice(drv('deco'), dset, { id: 'AA:BB:CC:00:00:01' }, 'Salon');
@@ -344,6 +439,20 @@ const clear = () => trig.splice(0);
   await master.onInit();
   await sat.onInit();
   const hub = app.decoHubs.get(dcHost);
+
+  await test('latency from Homey to each Deco (Insights)', async () => {
+    await hub.poll();
+    await new Promise((r) => setImmediate(r));
+    assert.strictEqual(master.caps.netmon_latency, 3.2);
+    assert.strictEqual(sat.caps.netmon_jitter, 0.5);
+    assert.strictEqual(sat.getDiagStatus().latency.latency, 3.2);
+    stub.rtt = { latency: 80, jitter: 20, loss: 0, max: 120, error: null };
+    sat.settings.max_latency = 50;
+    await hub.poll();
+    await new Promise((r) => setImmediate(r));
+    assert.ok(logged(/^High latency to this node: 80 ms/, 'warn').length >= 1);
+    stub.rtt = { latency: 3.2, jitter: 0.5, loss: 0, max: 4.1, error: null };
+  });
 
   await test('two devices share one hub and one login', async () => {
     assert.strictEqual(app.decoHubs.size, 1);
@@ -435,6 +544,8 @@ const clear = () => trig.splice(0);
     assert.strictEqual(fired('node_offline').length, 1);
     assert.strictEqual(fired('node_offline')[0].device, 'Dépendance');
     assert.strictEqual(sat.isOnline(), false);
+    assert.ok(homey.notes.some((n) => n === 'Dépendance : node offline'), JSON.stringify(homey.notes));
+    assert.ok(logged(/^node offline$/, 'error').some((e) => e.s === 'Dépendance'));
     dc.st.decos[1].group_status = 'connected';
     await hub.poll();
     assert.strictEqual(fired('node_online').length, 1);

@@ -7,14 +7,20 @@ Homey Pro app (SDK 3) that monitors a home network locally, without any cloud se
 | Driver | Measurements (Insights) | Flow triggers |
 |---|---|---|
 | **Internet quality** | Status, connectivity, latency, jitter, packet loss, LAN latency to the box, DNS time, download / upload / latency (speed test), outages and downtime today | Internet down (cause: `internet` / `lan`), Internet back (duration), speed test finished / failed, quality degraded / back to normal |
-| **Internet box** (provider chosen before pairing) | Internet link, public IP, connection and box uptime, line state; real-time down / up traffic (Livebox, Bbox); Rx / Tx optical power (Livebox); native speed test (Livebox) | Fibre down / back, connection renewed, box rebooted, public IP changed, fibre signal low / back to normal |
-| **Deco node** (one per node) | Online, clients on the node, client download / upload traffic and "Average traffic" tile indicator (rolling mean, window configurable); main Deco: clients total / 2.4 GHz / 5 GHz / wired, CPU, memory, Internet as seen by the Deco; wireless satellites: backhaul signal and speed | Node offline / online, backhaul weak / back to normal, device connected / disconnected |
+| **Internet box** (provider chosen before pairing) | Internet link quality score (%), Internet link, public IP, connection and box uptime, line state; real-time down / up traffic (Livebox, Bbox); Rx / Tx optical power (Livebox); native speed test results as their own curves: download / upload / latency (Livebox) | Fibre down / back, connection renewed, box rebooted, public IP changed, fibre signal low / back to normal |
+| **Deco node** (one per node) | Online, latency and jitter from Homey to the node (mesh backhaul included), clients on the node, client download / upload traffic and "Average traffic" tile indicator (rolling mean, window configurable); main Deco: clients total / 2.4 GHz / 5 GHz / wired, CPU, memory, Internet as seen by the Deco; wireless satellites: backhaul signal and speed | Node offline / online, backhaul weak / back to normal, device connected / disconnected |
 
 Conditions: Internet available, quality good, fibre link up, Deco online, a device (name, IP or MAC) connected anywhere on the mesh. Actions: run a speed test (plain, or advanced card returning the results as tokens).
+
+## Diagnostics
+
+App settings page, same design as the TSUN Micro-inverters app: status card of every device, timeline notification switches (Internet down / back, quality alerts, box, Deco), diagnostic log with four levels (error, warning, normal, detailed: every probe round, raw traffic counters, every Deco latency measurement), copy, clear, and a full report export (passwords removed, public IP and MAC addresses masked). A daily summary is logged at midnight (outages, latency / jitter / box latency average and maximum, alerts, speed tests). Latency, jitter and loss alerts state the probable location of the problem: when the latency to the box rises too, the delay builds up before the Internet (box busy or local network saturated).
 
 ## Design notes
 
 - **Probes** — Homey apps cannot send ICMP, so latency is the TCP handshake time to several anycast targets (default `1.1.1.1:443`, `8.8.8.8:443`, `9.9.9.9:443`). Internet is down only when *every* target fails during N consecutive rounds (N configurable), which removes false positives from a single unreachable endpoint. The box is probed separately to tell a LAN fault from an Internet outage. Jitter is computed per target, then the median is taken (samples to different servers are not comparable).
+- **Link quality** — 0-100 % score on the box device: weighted mean of the optical power (15 %), Internet latency (30 %), jitter (20 %), loss (25 %) and latency to the box (10 %), capped at the worst component + 30 so that one bad component cannot be hidden, then smoothed over ~3 polls. 0 when the link is down.
+- **Deco latency** — TCP handshake time from Homey to each node's IP (port 80 by default; a refused port answers just as fast), 5 samples per poll: median and jitter. For a satellite it includes the mesh backhaul.
 - **Alerts** — every threshold must be crossed N times in a row to raise an alert and to clear it (hysteresis). Latency samples taken while a speed test saturates the line are recorded but not evaluated. Download / upload thresholds are kept per speed-test source (Livebox: 500 / 400 Mbit/s, Homey: 60 / 60 Mbit/s by default); a source change restarts the speed alert counters.
 - **Speed test** — two sources. *Livebox* (default when a Livebox device is paired): the box's native test (`AutoDiag:executeDiagnostics` `speedService`, results from `SpeedTest:getWANResults`), measured by the box towards Orange servers, so the full line speed is measured. *Homey*: binary-free test against Cloudflare's public speed endpoints (`/__down`, `/__up`), 4 parallel streams, 1 s of TCP slow start discarded; capped at ~94 Mbit/s on Homey Pro (Early 2023), whose Ethernet adapter is 100 Mbit/s. In automatic mode the Homey test is the fallback when the Livebox test fails. The Deco speed test is only reachable through the TP-Link cloud, so it is not used.
 - **Livebox 5** — Sagemcom `sysbus` JSON API (`/ws`, `createContext` login, `X-Context` header). WAN status, ONT GPON MIBs (optical power), DHCP uptime, `getNetDevStats` counters. The 32-bit traffic counters wrap every ~34 s at 1 Gbit/s, so they are read every 10 s; a jump above 2.5 Gbit/s is treated as a counter reset.
@@ -37,9 +43,14 @@ Conditions: Internet available, quality good, fibre link up, Deco online, a devi
 | `com.pepane13.netmonitor/lib/probe.js` | TCP / DNS probes |
 | `com.pepane13.netmonitor/lib/speedtest.js` | Cloudflare speed test |
 | `com.pepane13.netmonitor/lib/monitor.js` | Outage tracker, threshold watch, counter rates (pure, unit-tested) |
+| `com.pepane13.netmonitor/lib/quality.js` | Link quality score, daily statistics (pure, unit-tested) |
+| `com.pepane13.netmonitor/lib/diaglog.js` | Diagnostic log (ring buffer persisted in the app settings, shared with the TSUN app) |
+| `com.pepane13.netmonitor/lib/diagreport.js` | Diagnostic report builder (masking, text + JSON) |
+| `com.pepane13.netmonitor/settings/index.html`, `api.js` | Settings page and its Web API |
 | `tools/build-manifest.js` | Generates `app.json` (single source of truth): `node tools/build-manifest.js` |
 | `test/protocol.test.js` | Protocol tests against local fake Livebox / Deco / speed servers: `node test/protocol.test.js` |
 | `test/device.test.js` | Device tests (Homey mock + fakes): `node test/device.test.js` |
+| `test/diagnostics.test.js` | Quality score, daily statistics, report masking, diagnostic log: `node test/diagnostics.test.js` |
 
 ## Install (development)
 

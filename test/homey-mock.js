@@ -18,7 +18,20 @@ const homey = {
     getActionCard: () => ({ registerRunListener() {} }),
   },
   manifest: { version: 'test' },
+  version: '12.4.0',
   app: null,
+  notes: [],
+  notifications: { createNotification: async ({ excerpt }) => { homey.notes.push(excerpt); } },
+  settings: (() => {
+    const store = {};
+    const listeners = [];
+    return {
+      store,
+      get: (k) => (k in store ? store[k] : null),
+      set: (k, v) => { store[k] = v; listeners.forEach((f) => f(k)); },
+      on: (ev, f) => listeners.push(f),
+    };
+  })(),
   registry: {},
   drivers: { getDriver: (id) => ({ getDevices: () => homey.registry[id] || [] }) },
 };

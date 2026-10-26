@@ -1,6 +1,6 @@
 {
   "id": "com.pepane13.netmonitor",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "compatibility": ">=12.2.0",
   "sdk": 3,
   "platforms": [
@@ -480,10 +480,14 @@
       "class": "sensor",
       "capabilities": [
         "netmon_online",
+        "netmon_quality",
         "netmon_power.rx",
         "netmon_power.tx",
         "netmon_throughput.down",
         "netmon_throughput.up",
+        "netmon_download.box",
+        "netmon_upload.box",
+        "netmon_latency.box",
         "netmon_uptime.wan",
         "netmon_uptime.box",
         "netmon_ip",
@@ -536,6 +540,30 @@
           "title": {
             "en": "Line state",
             "fr": "État de la ligne"
+          }
+        },
+        "netmon_quality": {
+          "title": {
+            "en": "Internet link quality",
+            "fr": "Qualité de la liaison Internet"
+          }
+        },
+        "netmon_download.box": {
+          "title": {
+            "en": "Download (box speed test)",
+            "fr": "Débit descendant (test de la box)"
+          }
+        },
+        "netmon_upload.box": {
+          "title": {
+            "en": "Upload (box speed test)",
+            "fr": "Débit montant (test de la box)"
+          }
+        },
+        "netmon_latency.box": {
+          "title": {
+            "en": "Latency (box speed test)",
+            "fr": "Latence (test de la box)"
           }
         }
       },
@@ -726,11 +754,25 @@
         "netmon_rate",
         "netmon_online",
         "netmon_clients",
+        "netmon_latency",
+        "netmon_jitter",
         "netmon_throughput.down",
         "netmon_throughput.up",
         "netmon_text"
       ],
       "capabilitiesOptions": {
+        "netmon_latency": {
+          "title": {
+            "en": "Latency from Homey (Wi-Fi mesh)",
+            "fr": "Latence depuis Homey (maillage Wi-Fi)"
+          }
+        },
+        "netmon_jitter": {
+          "title": {
+            "en": "Jitter from Homey",
+            "fr": "Gigue depuis Homey"
+          }
+        },
         "netmon_online": {
           "title": {
             "en": "Online",
@@ -920,6 +962,49 @@
               "hint": {
                 "en": "0 = no alert.",
                 "fr": "0 = pas d'alerte."
+              }
+            }
+          ]
+        },
+        {
+          "type": "group",
+          "label": {
+            "en": "Latency",
+            "fr": "Latence"
+          },
+          "children": [
+            {
+              "id": "max_latency",
+              "type": "number",
+              "label": {
+                "en": "Latency warning above",
+                "fr": "Avertissement de latence au-delà de"
+              },
+              "value": 50,
+              "min": 0,
+              "max": 2000,
+              "units": {
+                "en": "ms",
+                "fr": "ms"
+              },
+              "hint": {
+                "en": "Latency from Homey to this Deco, measured every poll (5 samples). For a satellite it includes the mesh backhaul. Above this value a warning is written to the diagnostic log. 0 = no warning.",
+                "fr": "Latence entre la Homey et ce Deco, mesurée à chaque interrogation (5 mesures). Pour un satellite, elle inclut la liaison maillée. Au-delà de cette valeur, un avertissement est écrit dans le journal de diagnostic. 0 = pas d'avertissement."
+              }
+            },
+            {
+              "id": "latency_port",
+              "type": "number",
+              "label": {
+                "en": "Measurement port",
+                "fr": "Port de mesure"
+              },
+              "value": 80,
+              "min": 1,
+              "max": 65535,
+              "hint": {
+                "en": "TCP port used for the measurement. An open or a closed port both answer: change it only if the Deco does not answer on 80.",
+                "fr": "Port TCP utilisé pour la mesure. Un port ouvert ou fermé répond dans les deux cas : à changer seulement si le Deco ne répond pas sur le 80."
               }
             }
           ]
@@ -1374,6 +1459,26 @@
       "insights": true,
       "chartType": "spline",
       "icon": "/assets/capabilities/cpu.svg"
+    },
+    "netmon_quality": {
+      "type": "number",
+      "title": {
+        "en": "Link quality",
+        "fr": "Qualité de la liaison"
+      },
+      "units": {
+        "en": "%",
+        "fr": "%"
+      },
+      "decimals": 0,
+      "getable": true,
+      "setable": false,
+      "uiComponent": "sensor",
+      "insights": true,
+      "chartType": "spline",
+      "icon": "/assets/capabilities/fiber.svg",
+      "min": 0,
+      "max": 100
     }
   },
   "flow": {
@@ -2164,5 +2269,23 @@
         ]
       }
     ]
+  },
+  "api": {
+    "getLog": {
+      "method": "GET",
+      "path": "/log"
+    },
+    "clearLog": {
+      "method": "DELETE",
+      "path": "/log"
+    },
+    "getStatus": {
+      "method": "GET",
+      "path": "/status"
+    },
+    "getReport": {
+      "method": "GET",
+      "path": "/report"
+    }
   }
 }

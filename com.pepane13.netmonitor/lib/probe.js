@@ -25,6 +25,47 @@ function tcpConnectTime(host, port, timeout = 3000) {
   });
 }
 
+/**
+ * Round-trip time to a LAN device in ms: TCP SYN answered by SYN/ACK (port open) or by RST
+ * (port closed, ECONNREFUSED) both measure the network path. Rejects only on timeout or no route.
+ */
+function tcpRtt(host, port, timeout = 1000) {
+  return new Promise((resolve, reject) => {
+    const start = process.hrtime.bigint();
+    const sock = net.connect({ host, port });
+    const elapsed = () => Number(process.hrtime.bigint() - start) / 1e6;
+    const done = (err) => {
+      sock.removeAllListeners();
+      sock.destroy();
+      if (!err || err.code === 'ECONNREFUSED') resolve(elapsed());
+      else reject(err);
+    };
+    sock.setTimeout(timeout, () => done(Object.assign(new Error('timeout'), { code: 'ETIMEDOUT' })));
+    sock.once('connect', () => done());
+    sock.once('error', done);
+  });
+}
+
+/** `samples` sequential RTT measurements: median, jitter and loss. */
+async function rttSeries(host, port, { samples = 5, timeout = 1000, rtt = tcpRtt } = {}) {
+  const times = [];
+  let lastError = null;
+  for (let i = 0; i < samples; i++) {
+    try {
+      times.push(await rtt(host, port, timeout));
+    } catch (e) {
+      lastError = e.code || e.message;
+    }
+  }
+  return {
+    latency: median(times),
+    jitter: times.length > 1 ? jitter(times) : null,
+    loss: ((samples - times.length) / samples) * 100,
+    max: times.length ? Math.max(...times) : null,
+    error: times.length ? null : lastError,
+  };
+}
+
 /** Parses "1.1.1.1:443, dns.google:443" into [{host, port}]. */
 function parseTargets(text, defaultPort = 443) {
   return String(text || '')
@@ -108,4 +149,4 @@ function dnsTime(hostname = 'www.google.com', timeout = 3000) {
   });
 }
 
-module.exports = { tcpConnectTime, parseTargets, probeRound, dnsTime, median, jitter };
+module.exports = { tcpConnectTime, tcpRtt, rttSeries, parseTargets, probeRound, dnsTime, median, jitter };

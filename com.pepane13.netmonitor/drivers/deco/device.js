@@ -1,6 +1,10 @@
 'use strict';
 
 const Homey = require('homey');
+const { rttSeries } = require('../../lib/probe');
+
+const RATE_LIMIT_MIN = 30;
+const round1 = (v) => (v == null ? null : Math.round(v * 10) / 10);
 
 const MASTER_CAPS = ['netmon_online.internet', 'netmon_clients.total', 'netmon_clients.band24', 'netmon_clients.band5', 'netmon_clients.wired', 'netmon_load.cpu', 'netmon_load.mem'];
 const WIRELESS_CAPS = ['netmon_signal.band5', 'netmon_signal.band24', 'netmon_speed'];
@@ -14,10 +18,16 @@ module.exports = class DecoDevice extends Homey.Device {
     this.state = this.getStoreValue('state') || { online: null, offlineSince: null, weak: false };
     // Devices paired before the traffic indicators existed
     this.samples = []; // traffic samples for the average indicator
-    for (const c of ['netmon_rate', 'netmon_throughput.down', 'netmon_throughput.up']) {
+    this.onceAt = {};
+    this.lastError = null;
+    this.lastSnapshotAt = null;
+    this.lastLatency = null;
+    this.measuring = false;
+    for (const c of ['netmon_rate', 'netmon_throughput.down', 'netmon_throughput.up', 'netmon_latency', 'netmon_jitter']) {
       if (!this.hasCapability(c)) await this.addCapability(c).catch((e) => this.error('addCapability', c, e.message));
     }
     this._subscribe();
+    this._diag('info', 'app', `${this._t('diag.device_started')} ${this.getSetting('node_ip') || this.getSetting('host') || ''}`);
     this.log('Deco device ready', this.getData().id);
   }
 
@@ -62,18 +72,49 @@ module.exports = class DecoDevice extends Homey.Device {
     for (const c of wanted) if (!present && this.hasCapability(c)) await this.removeCapability(c).catch((e) => this.error('removeCapability', c, e.message));
   }
 
+  /** Translated message with {var} placeholders replaced. */
+  _t(key, vars = {}) {
+    let s = this.homey.__(key);
+    if (typeof s !== 'string') s = key;
+    return s.replace(/\{(\w+)\}/g, (m, k) => (vars[k] !== undefined && vars[k] !== null ? String(vars[k]) : m));
+  }
+
+  _diag(level, category, message) {
+    const app = this.homey.app;
+    if (app && typeof app.logDiag === 'function') app.logDiag(level, this.getName(), category, message);
+  }
+
+  _diagOnce(key, minutes, level, category, message) {
+    const now = Date.now();
+    if (this.onceAt[key] && now - this.onceAt[key] < minutes * 60000) return false;
+    this.onceAt[key] = now;
+    this._diag(level, category, message);
+    return true;
+  }
+
+  _notify(key, message) {
+    const app = this.homey.app;
+    return app && typeof app.notify === 'function' ? app.notify(key, message) : Promise.resolve(false);
+  }
+
   _trigger(id, tokens = {}) {
     return this.homey.flow.getDeviceTriggerCard(id).trigger(this, tokens).catch((e) => this.error('trigger', id, e.message));
   }
 
   async onPollError(err) {
     this.failures++;
+    this.lastError = { t: new Date().toISOString(), text: err.message, code: err.code || null };
     if (err.code === 'EAUTH') {
+      this._diagOnce('auth', RATE_LIMIT_MIN, 'error', 'deco', this._t('diag.deco_auth'));
       await this.setUnavailable(this.homey.__('status.deco_owner'));
     } else if (err.code === 'EUNSUPPORTED') {
+      this._diagOnce('unsupported', 24 * 60, 'error', 'deco', this.homey.__('status.unsupported'));
       await this.setUnavailable(this.homey.__('status.unsupported'));
     } else if (this.failures >= 3) {
+      if (this.failures === 3) this._diag('error', 'deco', this._t('diag.deco_unreachable', { n: this.failures, error: err.message }));
       await this.setUnavailable(`${this.homey.__('status.unreachable')} (${err.message})`);
+    } else {
+      this._diag('debug', 'deco', this._t('diag.deco_poll_failed', { n: this.failures, error: err.message }));
     }
   }
 
@@ -87,7 +128,9 @@ module.exports = class DecoDevice extends Homey.Device {
   }
 
   async onSnapshot(snap) {
+    if (this.failures >= 3) this._diag('info', 'deco', this._t('diag.deco_back', { n: this.failures }));
     this.failures = 0;
+    this.lastSnapshotAt = new Date(snap.ts).toISOString();
     if (!this.getAvailable()) await this.setAvailable().catch(() => {});
     const node = snap.decos.find((d) => d.mac === this.mac);
     const now = snap.ts;
@@ -98,16 +141,30 @@ module.exports = class DecoDevice extends Homey.Device {
       if (!online) {
         this.state.offlineSince = now;
         this.log('Deco offline');
+        const msg = this._t('diag.node_offline');
+        this._diag('error', 'deco', msg);
+        await this._notify('notify_deco', `${this.getName()} : ${msg}`);
         await this._trigger('node_offline');
       } else {
         const duration = this.state.offlineSince ? Math.round((now - this.state.offlineSince) / 1000) : 0;
         this.state.offlineSince = null;
         this.log(`Deco back online after ${duration} s`);
+        const msg = this._t('diag.node_online', { minutes: round1(duration / 60) });
+        this._diag('warn', 'deco', msg);
+        await this._notify('notify_deco', `${this.getName()} : ${msg}`);
         await this._trigger('node_online', { duration });
       }
     }
     this.state.online = online;
     await this._set('netmon_online', online);
+
+    if (node && node.online && node.ip && !this.measuring) {
+      // Not awaited: the shared poll loop must not wait for the latency measurement
+      this._measureLatency(node).catch((e) => this.error('latency', e.message));
+    } else if (!online) {
+      await this._set('netmon_latency', null);
+      await this._set('netmon_jitter', null);
+    }
 
     if (node) {
       await this._updateInfo(node);
@@ -194,9 +251,13 @@ module.exports = class DecoDevice extends Homey.Device {
     if (!this.state.weak && this.weakCount >= 2) {
       this.state.weak = true;
       this.log(`Backhaul weak: signal ${signal}, ${speed} Mbit/s`);
+      const msg = this._t('diag.backhaul_weak', { signal: signal ?? '—', speed: speed ?? '—' });
+      this._diag('warn', 'deco', msg);
+      await this._notify('notify_deco', `${this.getName()} : ${msg}`);
       await this._trigger('backhaul_weak', { signal: signal ?? -1, speed: speed ?? 0 });
     } else if (this.state.weak && this.okCount >= 2) {
       this.state.weak = false;
+      this._diag('info', 'deco', this._t('diag.backhaul_ok', { signal: signal ?? '—', speed: speed ?? '—' }));
       await this._trigger('backhaul_ok', { signal: signal ?? -1, speed: speed ?? 0 });
     }
   }
@@ -217,12 +278,69 @@ module.exports = class DecoDevice extends Homey.Device {
     if (!prev) return; // first snapshot: no events
     for (const [mac, c] of current) {
       if (!prev.has(mac)) {
+        this._diag('debug', 'deco', this._t('diag.client_on', { name: c.name || mac, band: this._bandLabel(c.band) }));
         await this._trigger('client_connected', { name: c.name || mac, mac, ip: c.ip || '', band: this._bandLabel(c.band), network: c.network || 'main' });
       }
     }
     for (const [mac, c] of prev) {
-      if (!current.has(mac)) await this._trigger('client_disconnected', { name: c.name || mac, mac });
+      if (!current.has(mac)) {
+        this._diag('debug', 'deco', this._t('diag.client_off', { name: c.name || mac }));
+        await this._trigger('client_disconnected', { name: c.name || mac, mac });
+      }
     }
+  }
+
+  /**
+   * Latency Homey -> this Deco (TCP handshake on port 80; a refused port answers just as fast, so
+   * any node can be measured). For a satellite this includes the mesh backhaul (5 GHz for wireless
+   * satellites), which is what slows Wi-Fi clients down when the link degrades.
+   */
+  async _measureLatency(node) {
+    this.measuring = true;
+    try {
+      const r = await rttSeries(node.ip, Number(this.getSetting('latency_port')) || 80, { samples: 5, timeout: 1000 });
+      this.lastLatency = { t: new Date().toISOString(), ...r };
+      await this._set('netmon_latency', round1(r.latency));
+      await this._set('netmon_jitter', round1(r.jitter));
+      if (r.latency == null) {
+        this._diagOnce('lat_none', RATE_LIMIT_MIN, 'warn', 'deco', this._t('diag.deco_no_rtt', { ip: node.ip, error: r.error || '?' }));
+        return;
+      }
+      const max = Number(this.getSetting('max_latency')) || 0;
+      this._diag('debug', 'deco', this._t('diag.deco_rtt', { ms: round1(r.latency), jitter: round1(r.jitter) ?? '—', loss: Math.round(r.loss), max: round1(r.max) }));
+      if (max && r.latency > max) {
+        this._diagOnce('lat_high', RATE_LIMIT_MIN, 'warn', 'deco', this._t('diag.deco_rtt_high', {
+          ms: round1(r.latency), limit: max, backhaul: this.getCapabilityValue('netmon_text') || '?',
+        }));
+      }
+      if (r.loss >= 40) this._diagOnce('lat_loss', RATE_LIMIT_MIN, 'warn', 'deco', this._t('diag.deco_rtt_loss', { loss: Math.round(r.loss) }));
+    } finally {
+      this.measuring = false;
+    }
+  }
+
+  getDiagStatus() {
+    return {
+      driver: 'deco',
+      id: this.getData().id,
+      name: this.getName(),
+      kind: 'deco',
+      host: this.getSetting('node_ip') || '',
+      available: this.getAvailable(),
+      online: this.getCapabilityValue('netmon_online'),
+      role: this.getSetting('node_role') || '',
+      backhaul: this.getCapabilityValue('netmon_text'),
+      clients: this.getCapabilityValue('netmon_clients'),
+      latency: this.lastLatency,
+      lastSnapshotAt: this.lastSnapshotAt,
+      lastError: this.lastError,
+    };
+  }
+
+  getDiagReport() {
+    const values = {};
+    for (const c of this.getCapabilities()) values[c] = this.getCapabilityValue(c);
+    return { driver: 'deco', name: this.getName(), status: this.getDiagStatus(), settings: this.getSettings(), values };
   }
 
   isOnline() {

@@ -1,4 +1,8 @@
 {
+  "1.1.0": {
+    "en": "Diagnostic log and settings page (status of every device, log levels, copy, report export) with timeline notifications you can switch on or off, and a daily summary. New Insights curves: Internet link quality (%) and the box speed tests on the box device, latency and jitter from Homey to every Deco. Latency alerts now say whether the delay builds up on the local side or on the Internet side. Impossible traffic samples are discarded.",
+    "fr": "Journal de diagnostic et page de réglages (état de chaque appareil, niveaux de journal, copie, export du rapport) avec des notifications activables, et un bilan quotidien. Nouvelles courbes Insights : qualité de la liaison Internet (%) et tests de débit de la box sur l'appareil box, latence et gigue de la Homey vers chaque Deco. Les alertes de latence précisent si le retard vient du réseau local ou d'Internet. Les mesures de trafic impossibles sont écartées."
+  },
   "1.0.1": {
     "en": "Corrected jitter measurement (computed per target, no more false alerts) and updated app description.",
     "fr": "Mesure de la gigue corrigée (calculée par cible, plus de fausses alertes) et description de l'app mise à jour."

@@ -99,10 +99,10 @@ class LiveboxClient {
   }
 
   /** WAN traffic counters (32-bit on the Livebox: read them often). */
-  async readCounters() {
-    const ont = await this._findOntKey();
-    const s = (await this.call(`NeMo.Intf.${ont}`, 'getNetDevStats')).status || {};
-    return { rx: typeof s.RxBytes === 'number' ? s.RxBytes : null, tx: typeof s.TxBytes === 'number' ? s.TxBytes : null };
+  async readCounters(intf) {
+    const key = intf || await this._findOntKey();
+    const s = (await this.call(`NeMo.Intf.${key}`, 'getNetDevStats')).status || {};
+    return { rx: typeof s.RxBytes === 'number' ? s.RxBytes : null, tx: typeof s.TxBytes === 'number' ? s.TxBytes : null, intf: key };
   }
 
   async _findOntKey() {
