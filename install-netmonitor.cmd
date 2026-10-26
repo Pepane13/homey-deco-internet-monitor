@@ -22,7 +22,19 @@ call homey.cmd app validate --level publish || (echo [ERREUR] Validation echouee
 
 echo.
 echo === Installation sur la Homey ===
-call homey.cmd app install || (echo [ERREUR] Installation echouee. & goto :end)
+set "LOG=%TEMP%\netmonitor-install.log"
+call homey.cmd app install > "%LOG%" 2>&1
+type "%LOG%"
+rem The Homey CLI exits with code 0 even when the installation fails: check its output.
+findstr /C:"successfully installed" "%LOG%" >nul || (
+  echo.
+  echo [ERREUR] Installation echouee sur la Homey.
+  findstr /C:"homeypro.net" "%LOG%" >nul && (
+    echo La Homey a ete jointe par le cloud et non par le reseau local.
+    echo Connecte ce PC au meme reseau que la Homey, sans VPN, puis relance le script.
+  )
+  goto :end
+)
 
 echo.
 echo [OK] Deco and Internet Monitor installee.
