@@ -18,6 +18,6 @@ module.exports = class InternetDriver extends Homey.Driver {
 
   async onPairListDevices() {
     if (this.getDevices().length) return [];
-    return [{ name: 'Internet', data: { id: 'internet' } }];
+    return [{ name: 'Internet Link Monitoring', data: { id: 'internet' } }];
   }
 };
