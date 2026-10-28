@@ -312,6 +312,8 @@ module.exports = class LiveboxDevice extends Homey.Device {
       const d = this.homey.drivers.getDriver('internet').getDevices()[0];
       if (!d) return {};
       const v = (c) => (d.hasCapability(c) ? d.getCapabilityValue(c) : null);
+      // A round delayed locally (box or Homey busy) is not an Internet latency problem: the LAN part still counts
+      if (d.lastRoundLocal) return { loss: v('netmon_loss'), lanLatency: v('netmon_latency.gateway') };
       return { latency: v('netmon_latency'), jitter: v('netmon_jitter'), loss: v('netmon_loss'), lanLatency: v('netmon_latency.gateway') };
     } catch (e) {
       return {};

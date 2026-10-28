@@ -94,6 +94,17 @@ function jitter(values) {
 }
 
 /**
+ * Jitter robust to one isolated slow sample: with 3 samples or more, the slowest one is left out
+ * (a single delayed connection is a hiccup, not jitter), then the RFC 3550 style estimate is used.
+ * Jitter that affects several samples of the series is still reported.
+ */
+function trimmedJitter(values) {
+  if (values.length < 3) return jitter(values);
+  const drop = values.indexOf(Math.max(...values));
+  return jitter(values.filter((_, i) => i !== drop));
+}
+
+/**
  * One probe round: `samples` connections to each target, sequential to avoid self-induced jitter.
  * @returns {Promise<{online:boolean, latency:number|null, jitter:number|null, loss:number, reachable:number, total:number, perTarget:object[]}>}
  */
@@ -113,7 +124,7 @@ async function probeRound(targets, { samples = 3, timeout = 3000, connect = tcpC
         lastError = e.code || e.message;
       }
     }
-    perTarget.push({ target: `${t.host}:${t.port}`, ok: times.length > 0, latency: median(times), jitter: times.length > 1 ? jitter(times) : null, error: times.length ? null : lastError });
+    perTarget.push({ target: `${t.host}:${t.port}`, ok: times.length > 0, latency: median(times), jitter: times.length > 1 ? trimmedJitter(times) : null, error: times.length ? null : lastError });
   }
   const reachable = perTarget.filter((p) => p.ok).length;
   const best = perTarget.filter((p) => p.ok).map((p) => p.latency);
@@ -149,4 +160,4 @@ function dnsTime(hostname = 'www.google.com', timeout = 3000) {
   });
 }
 
-module.exports = { tcpConnectTime, tcpRtt, rttSeries, parseTargets, probeRound, dnsTime, median, jitter };
+module.exports = { tcpConnectTime, tcpRtt, rttSeries, parseTargets, probeRound, dnsTime, median, jitter, trimmedJitter };

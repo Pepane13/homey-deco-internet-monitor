@@ -1,6 +1,6 @@
 {
   "id": "com.pepane13.netmonitor",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "compatibility": ">=12.2.0",
   "sdk": 3,
   "platforms": [
@@ -402,7 +402,7 @@
                 "en": "Maximum latency",
                 "fr": "Latence maximum"
               },
-              "value": 30,
+              "value": 50,
               "min": 0,
               "max": 2000,
               "units": {
@@ -421,7 +421,7 @@
                 "en": "Maximum jitter",
                 "fr": "Gigue maximum"
               },
-              "value": 15,
+              "value": 30,
               "min": 0,
               "max": 1000,
               "units": {
@@ -459,7 +459,7 @@
                 "en": "Consecutive measurements",
                 "fr": "Mesures consécutives"
               },
-              "value": 2,
+              "value": 4,
               "min": 1,
               "max": 10,
               "hint": {

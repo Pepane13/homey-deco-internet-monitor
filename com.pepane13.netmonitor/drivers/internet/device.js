@@ -6,6 +6,7 @@ const { runSpeedtest } = require('../../lib/speedtest');
 const { OutageTracker, ThresholdWatch } = require('../../lib/monitor');
 const { DayStats, dayKey, timeOf } = require('../../lib/quality');
 
+const LOCAL_DELAY_MIN_MS = 20;
 const RATE_LIMIT_MIN = 30; // same warning at most once per 30 min
 
 const round1 = (v) => (v == null ? null : Math.round(v * 10) / 10);
@@ -26,6 +27,7 @@ module.exports = class InternetDevice extends Homey.Device {
     this.speedRunning = null;
     this.lastSource = this.getStoreValue('last_source') || null;
     await this._migrateThresholds();
+    await this._migrateQualityThresholds();
     this.tracker = new OutageTracker({ confirm: this.getSetting('confirm_rounds') || 2, state: this.getStoreValue('outages') || undefined });
     this.watch = new ThresholdWatch(this._rules(), this.getSetting('consecutive') || 2, this.getStoreValue('watch') || undefined);
     await this._ensureCapabilities();
@@ -37,6 +39,9 @@ module.exports = class InternetDevice extends Homey.Device {
     this.rounds = 0;
     if (this.getCapabilityValue('netmon_status') == null) await this._set('netmon_status', 'unknown');
     this._diag('info', 'app', `${this._t('diag.device_started')} (${this._t('diag.probes_every', { s: Number(this.getSetting('probe_interval')) || 30 })})`);
+    if (this.migratedQuality) {
+      this._diag('info', 'app', this._t('diag.thresholds_migrated', { values: Object.entries(this.migratedQuality).map(([k, v]) => `${k}=${v}`).join(', ') }));
+    }
     this._scheduleProbe(2000);
     this._scheduleSpeedtest(true);
     this.log('Internet quality device ready');
@@ -62,6 +67,26 @@ module.exports = class InternetDevice extends Homey.Device {
       this.log('Speed thresholds migrated to 500 / 400 Mbit/s (Livebox test)');
     }
     await this.setStoreValue('thresholds_v2', true);
+  }
+
+  /**
+   * v1.1.1: latency / jitter alerts tuned on real data (one-off spikes of a few seconds are frequent
+   * and harmless). Devices still on the v1.0 / v1.1 defaults move to 50 ms / 30 ms / 4 rounds;
+   * custom values are left untouched.
+   */
+  async _migrateQualityThresholds() {
+    if (this.getStoreValue('thresholds_v3')) return;
+    const s = this.getSettings();
+    const next = {};
+    if (s.max_latency === 30) next.max_latency = 50;
+    if (s.max_jitter === 15) next.max_jitter = 30;
+    if (s.consecutive === 2) next.consecutive = 4;
+    if (Object.keys(next).length) {
+      await this.setSettings(next).catch((e) => this.error('threshold migration', e.message));
+      this.log('Quality thresholds migrated', JSON.stringify(next));
+      this.migratedQuality = next;
+    }
+    await this.setStoreValue('thresholds_v3', true);
   }
 
   _rules() {
@@ -186,30 +211,25 @@ module.exports = class InternetDevice extends Homey.Device {
     const now = Date.now();
     this._rollDay(now);
     const targets = parseTargets(this.getSetting('probe_targets') || '1.1.1.1:443, 8.8.8.8:443, 9.9.9.9:443');
+    const gwSetting = this._gatewaySetting();
+    const gw = parseTargets(gwSetting, 80)[0];
+    // The box is timed before and after the Internet probes: a slow answer on either side means the
+    // round was delayed locally (box busy, local network loaded, or Homey itself busy)
+    const lanBefore = gw ? await this._lanTime(gw) : null;
     const r = await probeRound(targets, { samples: 3, timeout: 3000 });
-
+    const lanAfter = gw ? await this._lanTime(gw) : null;
+    const lanTimes = [lanBefore, lanAfter].filter((v) => v != null);
     let gatewayOk = null;
     let lanLatency = null;
-    let gwSetting = this.getSetting('gateway') || '';
-    if (gwSetting === '192.168.1.1:80') {
-      // Default value: follow the address of the paired box (e.g. a Bbox answers on 192.168.1.254)
-      try {
-        const box = this.homey.drivers.getDriver('livebox').getDevices()[0];
-        const host = box && String(box.getSetting('host') || '').replace(/^https?:\/\//, '').replace(/[/:].*$/, '');
-        if (host) gwSetting = `${host}:80`;
-      } catch (e) { /* no box device */ }
-    }
-    const gw = parseTargets(gwSetting, 80)[0];
+    let lanPeak = null;
     if (gw) {
-      try {
-        lanLatency = await tcpConnectTime(gw.host, gw.port, 2000);
-        await this._set('netmon_latency.gateway', round1(lanLatency));
-        gatewayOk = true;
-      } catch (e) {
-        await this._set('netmon_latency.gateway', null);
-        gatewayOk = false;
-      }
+      gatewayOk = lanTimes.length > 0;
+      lanLatency = lanTimes.length ? Math.min(...lanTimes) : null;
+      lanPeak = lanTimes.length ? Math.max(...lanTimes) : null;
+      await this._set('netmon_latency.gateway', round1(lanLatency));
     }
+    const local = this._isLocalDelay(lanPeak);
+    this.lastRoundLocal = local;
     let dns = null;
     try {
       dns = await dnsTime('www.google.com', 3000);
@@ -218,10 +238,11 @@ module.exports = class InternetDevice extends Homey.Device {
       await this._set('netmon_dns', null);
       this._diagOnce('dns', RATE_LIMIT_MIN, 'warn', 'internet', this._t('diag.dns_failed', { error: e.code || e.message }));
     }
-    this.lastRound = { t: new Date(now).toISOString(), ...r, lan: lanLatency, dns, speedRunning: !!this.speedRunning };
+    this.lastRound = { t: new Date(now).toISOString(), ...r, lan: lanLatency, lanPeak, local, dns, speedRunning: !!this.speedRunning };
     this.rounds++;
     this.stats.count('rounds');
-    if (r.online && !this.speedRunning) {
+    if (local) this.stats.count('local_rounds');
+    if (r.online && !this.speedRunning && !local) {
       this.stats.add('latency', r.latency, now);
       this.stats.add('jitter', r.jitter, now);
     }
@@ -230,7 +251,7 @@ module.exports = class InternetDevice extends Homey.Device {
     const per = (r.perTarget || []).map((t) => `${t.target} ${t.ok ? `${round1(t.latency)} ms` : (t.error || 'KO')}`).join(', ');
     this._diag('debug', 'internet', this._t('diag.round', {
       latency: round1(r.latency) ?? '—', jitter: round1(r.jitter) ?? '—', loss: Math.round(r.loss), lan: round1(lanLatency) ?? '—', dns: dns == null ? '—' : Math.round(dns), targets: per,
-    }) + (this.speedRunning ? ` ${this._t('diag.during_speedtest')}` : ''));
+    }) + (this.speedRunning ? ` ${this._t('diag.during_speedtest')}` : '') + (local ? ` ${this._t('diag.local_round', { lan: round1(lanPeak) })}` : ''));
     if (r.online && r.reachable < r.total) {
       this._diagOnce('partial', RATE_LIMIT_MIN, 'info', 'internet', this._t('diag.partial', { ok: r.reachable, total: r.total, targets: per }));
     }
@@ -268,14 +289,50 @@ module.exports = class InternetDevice extends Homey.Device {
     await this.setStoreValue('outages', this.tracker.toJSON());
 
     // A running speed test saturates the line (bufferbloat): latency samples are not representative
+    // A round delayed locally says nothing about the Internet link: latency / jitter are not evaluated
+    // (the curves still show them). Loss is always evaluated: a lost connection is not a local delay.
     if (r.online && !this.speedRunning) {
-      const ctx = { lan: lanLatency };
-      await this._evaluate('latency', r.latency, ctx);
-      await this._evaluate('jitter', r.jitter, ctx);
+      const ctx = { lan: lanPeak };
+      if (!local) {
+        await this._evaluate('latency', r.latency, ctx);
+        await this._evaluate('jitter', r.jitter, ctx);
+      }
       await this._evaluate('loss', r.loss, ctx);
     }
     await this._refreshStatus();
     return r;
+  }
+
+  /** Address of the box used for the local latency (defaults to the paired box). */
+  _gatewaySetting() {
+    const gwSetting = this.getSetting('gateway') || '';
+    if (gwSetting !== '192.168.1.1:80') return gwSetting;
+    // Default value: follow the address of the paired box (e.g. a Bbox answers on 192.168.1.254)
+    try {
+      const box = this.homey.drivers.getDriver('livebox').getDevices()[0];
+      const host = box && String(box.getSetting('host') || '').replace(/^https?:\/\//, '').replace(/[/:].*$/, '');
+      if (host) return `${host}:80`;
+    } catch (e) { /* no box device */ }
+    return gwSetting;
+  }
+
+  async _lanTime(gw) {
+    try {
+      return await tcpConnectTime(gw.host, gw.port, 2000);
+    } catch (e) {
+      return null;
+    }
+  }
+
+  /**
+   * True when the round was delayed before reaching the Internet: the box answered slowly
+   * (>= 20 ms and more than 3 x its usual time of the day, which is about 6 ms on a Livebox).
+   */
+  _isLocalDelay(lanPeak) {
+    if (lanPeak == null) return false;
+    const lan = this.stats.get('lan');
+    const usual = lan && lan.n >= 10 ? lan.avg : 6;
+    return lanPeak >= LOCAL_DELAY_MIN_MS && lanPeak > usual * 3;
   }
 
   /**

@@ -125,7 +125,9 @@
     "deco_no_rtt": "Latence non mesurable : {ip} ne répond pas ({error})",
     "deco_rtt": "Latence {ms} ms, gigue {jitter} ms, perte {loss} %, max {max} ms",
     "deco_rtt_high": "Latence élevée vers ce module : {ms} ms (seuil {limit} ms, liaison {backhaul})",
-    "deco_rtt_loss": "Pertes vers ce module : {loss} % des mesures sans réponse"
+    "deco_rtt_loss": "Pertes vers ce module : {loss} % des mesures sans réponse",
+    "local_round": "(retard local : la box a répondu en {lan} ms, latence et gigue non évaluées)",
+    "thresholds_migrated": "Seuils d'alerte mis à jour vers les nouvelles valeurs par défaut : {values}"
   },
   "settings": {
     "title": "Deco & Internet Monitor – Diagnostic",

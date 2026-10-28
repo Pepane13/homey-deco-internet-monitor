@@ -8,20 +8,24 @@ const APP = path.join(__dirname, '..', 'com.pepane13.netmonitor');
 const { linkQuality, scale, DayStats, dayKey } = require(`${APP}/lib/quality`);
 const { buildReport, maskIp, maskMac } = require(`${APP}/lib/diagreport`);
 const { DiagLog } = require(`${APP}/lib/diaglog`);
+const { jitter, trimmedJitter, probeRound } = require(`${APP}/lib/probe`);
 
 let passed = 0;
+const queue = [];
 function test(name, fn) {
-  try {
-    fn();
-    passed++;
-    console.log(`  ok  ${name}`);
-  } catch (e) {
-    console.log(`  FAIL ${name}\n       ${e.stack}`);
-    process.exitCode = 1;
-  }
+  queue.push(async () => {
+    try {
+      await fn();
+      passed++;
+      console.log(`  ok  ${name}`);
+    } catch (e) {
+      console.log(`  FAIL ${name}\n       ${e.stack}`);
+      process.exitCode = 1;
+    }
+  });
 }
 
-console.log('Link quality score');
+queue.push(async () => console.log('Link quality score'));
 test('scale is linear between good and bad, clamped, works in both directions', () => {
   assert.strictEqual(scale(20, 20, 100, 10), 100);
   assert.strictEqual(scale(60, 20, 100, 10), 55);
@@ -44,7 +48,7 @@ test('one bad component cannot be hidden by good ones', () => {
   assert.ok(evening.score > 40 && evening.score < 80, JSON.stringify(evening));
 });
 
-console.log('Daily statistics');
+queue.push(async () => console.log('Daily statistics'));
 test('min / max / average and roll-over return the finished day', () => {
   const d = new DayStats();
   assert.strictEqual(d.roll('2026-10-25'), null);
@@ -63,7 +67,7 @@ test('day key follows the Homey time zone', () => {
   assert.strictEqual(dayKey(Date.parse('2026-10-25T23:30:00Z'), 'UTC'), '2026-10-25');
 });
 
-console.log('Diagnostic report');
+queue.push(async () => console.log('Diagnostic report'));
 test('passwords removed, public IP and MAC masked, log included', () => {
   const r = buildReport({
     generated: '2026-10-26T08:00:00Z',
@@ -90,7 +94,7 @@ test('passwords removed, public IP and MAC masked, log included', () => {
   assert.strictEqual(maskMac('bad'), 'bad');
 });
 
-console.log('Diagnostic log (shared with the TSUN app)');
+queue.push(async () => console.log('Diagnostic log (shared with the TSUN app)'));
 test('levels filter, ring buffer persisted in the app settings', () => {
   const store = {};
   const timers = [];
@@ -111,4 +115,23 @@ test('levels filter, ring buffer persisted in the app settings', () => {
   assert.strictEqual(new DiagLog(homey).get('debug').length, 2);
 });
 
-console.log(`\n${passed} passed${process.exitCode ? ', some FAILED' : ''}`);
+queue.push(async () => console.log('Jitter'));
+test('one isolated slow sample is a hiccup, not jitter; jitter on several samples is kept', async () => {
+  assert.strictEqual(jitter([15, 115, 15]), 100);
+  assert.strictEqual(trimmedJitter([15, 115, 15]), 0);
+  assert.strictEqual(trimmedJitter([15, 16]), 1);
+  assert.strictEqual(trimmedJitter([10, 60, 110]), 50, 'two slow samples out of three still show');
+});
+
+test('probe round: one slow connection per target no longer inflates the round jitter', async () => {
+  const seq = { a: [14, 120, 15], b: [16, 15, 90], c: [15, 15, 16] };
+  const connect = async (host) => seq[host].shift();
+  const r = await probeRound([{ host: 'a', port: 1 }, { host: 'b', port: 1 }, { host: 'c', port: 1 }], { connect });
+  assert.ok(r.jitter <= 1, JSON.stringify(r));
+  assert.strictEqual(r.latency, 15, 'median of the per-target medians');
+});
+
+(async () => {
+  for (const t of queue) await t();
+  console.log(`\n${passed} passed${process.exitCode ? ', some FAILED' : ''}`);
+})();

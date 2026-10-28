@@ -125,7 +125,9 @@
     "deco_no_rtt": "Latency cannot be measured: {ip} does not answer ({error})",
     "deco_rtt": "Latency {ms} ms, jitter {jitter} ms, loss {loss} %, max {max} ms",
     "deco_rtt_high": "High latency to this node: {ms} ms (threshold {limit} ms, backhaul {backhaul})",
-    "deco_rtt_loss": "Loss to this node: {loss} % of the measurements unanswered"
+    "deco_rtt_loss": "Loss to this node: {loss} % of the measurements unanswered",
+    "local_round": "(delayed locally: box answered in {lan} ms, latency and jitter not evaluated)",
+    "thresholds_migrated": "Alert thresholds updated to the new defaults: {values}"
   },
   "settings": {
     "title": "Deco & Internet Monitor – Diagnostics",

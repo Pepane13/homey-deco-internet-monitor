@@ -93,7 +93,9 @@ const clear = () => trig.splice(0);
   const InternetDevice = require(`${APP}/drivers/internet/device.js`);
   const settings = {};
   for (const g of drv('internet').settings) for (const s of g.children) settings[s.id] = s.value;
-  const inet = new InternetDevice(drv('internet'), settings, { id: 'internet' }, 'Internet');
+  // The original quality tests use the v1.1.0 thresholds (30 ms / 15 ms / 2 rounds), kept as custom values
+  const inet = new InternetDevice(drv('internet'), { ...settings, max_latency: 30, max_jitter: 15, consecutive: 2 }, { id: 'internet' }, 'Internet');
+  inet.store.thresholds_v3 = true;
   await inet.onInit();
 
   await test('all capabilities created, status unknown before the first probe', async () => {
@@ -251,19 +253,51 @@ const clear = () => trig.splice(0);
     clear();
   });
 
-  await test('latency alert with a slow box is attributed to the local side; not notified by default', async () => {
+  await test('round delayed locally (slow box): latency not evaluated, logged as local, loss still evaluated', async () => {
+    homey.notes.length = 0;
+    const n0 = logged(/^Quality degraded: Latency/, 'warn').length;
+    const l0 = inet.stats.counters.local_rounds || 0;
+    homey.settings.set('log_level', 'debug');
+    stub.latency = 48; stub.gwMs = 45;
+    await inet.probe(); await inet.probe(); await inet.probe();
+    assert.strictEqual(logged(/^Quality degraded: Latency/, 'warn').length, n0, 'no Internet latency alert');
+    assert.strictEqual(inet.lastRoundLocal, true);
+    assert.strictEqual((inet.stats.counters.local_rounds || 0) - l0, 3);
+    assert.strictEqual(inet.caps.netmon_latency, 48, 'value still recorded for the chart');
+    assert.ok(logged(/delayed locally: box answered in 45 ms/, 'debug').length >= 1);
+    assert.ok(!homey.notes.some((n) => /Quality degraded/.test(n)));
+    homey.settings.set('log_level', 'info');
+    stub.latency = 6; stub.gwMs = 0.8;
+    await inet.probe();
+    assert.strictEqual(inet.lastRoundLocal, false);
+    clear();
+  });
+
+  await test('latency alert with a normal box is attributed to the Internet side; not notified by default', async () => {
     homey.notes.length = 0;
     const n0 = logged(/^Quality degraded: Latency 48 ms/, 'warn').length;
-    stub.latency = 48; stub.gwMs = 45;
+    stub.latency = 48; stub.gwMs = 0.8;
     await inet.probe(); await inet.probe();
     const d = logged(/^Quality degraded: Latency 48 ms/, 'warn').slice(n0);
     assert.strictEqual(d.length, 1);
-    assert.ok(/Latency to the box is high too \(45 ms\)/.test(d[0].m), d[0].m);
+    assert.ok(/Latency to the box is normal/.test(d[0].m), d[0].m);
     assert.ok(!homey.notes.some((n) => /Quality degraded/.test(n)), 'quality alerts are off by default');
-    stub.latency = 6; stub.gwMs = 0.8;
+    stub.latency = 6;
     await inet.probe(); await inet.probe();
     assert.ok(logged(/^Latency back to normal/, 'info').length >= 1);
     clear();
+  });
+
+  await test('v1.1.0 default quality thresholds migrated to 50 ms / 30 ms / 4 rounds, custom values kept', async () => {
+    const old = new InternetDevice(drv('internet'), { ...settings, max_latency: 30, max_jitter: 15, consecutive: 2 }, { id: 'internet' }, 'Internet');
+    await old._migrateQualityThresholds();
+    assert.deepStrictEqual([old.settings.max_latency, old.settings.max_jitter, old.settings.consecutive], [50, 30, 4]);
+    const custom = new InternetDevice(drv('internet'), { ...settings, max_latency: 40, max_jitter: 15, consecutive: 3 }, { id: 'internet' }, 'Internet');
+    await custom._migrateQualityThresholds();
+    assert.deepStrictEqual([custom.settings.max_latency, custom.settings.max_jitter, custom.settings.consecutive], [40, 30, 3]);
+    await custom._migrateQualityThresholds();
+    assert.strictEqual(custom.store.thresholds_v3, true);
+    assert.deepStrictEqual([settings.max_latency, settings.max_jitter, settings.consecutive], [50, 30, 4], 'new defaults');
   });
 
   await test('daily summary logged at the first probe of a new day', async () => {
