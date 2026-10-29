@@ -4,6 +4,7 @@ const Homey = require('homey');
 const { createBoxClient } = require('../../lib/boxes');
 const { counterRate } = require('../../lib/monitor');
 const { linkQuality, timeOf } = require('../../lib/quality');
+const { isLocalNetError } = require('../../lib/netif');
 
 const RATE_LIMIT_MIN = 30;
 
@@ -199,7 +200,7 @@ module.exports = class LiveboxDevice extends Homey.Device {
         this._diagOnce('auth', RATE_LIMIT_MIN, 'error', 'box', this._t('diag.box_auth'));
         await this.setUnavailable(this.homey.__('status.auth')).catch(() => {});
       } else if (this.failures >= 3) {
-        if (this.failures === 3) this._diag('error', 'box', this._t('diag.box_unreachable', { n: this.failures, error: e.message }));
+        if (this.failures === 3) this._diag('error', 'box', this._t('diag.box_unreachable', { n: this.failures, error: e.message }) + (isLocalNetError(e.code) ? ` ${this._t('diag.homey_net_hint')}` : ''));
         await this.setUnavailable(`${this.homey.__('status.unreachable')} (${e.message})`).catch(() => {});
       } else {
         this._diag('debug', 'box', this._t('diag.box_poll_failed', { n: this.failures, error: e.message }));

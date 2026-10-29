@@ -2,6 +2,7 @@
 
 const Homey = require('homey');
 const { rttSeries } = require('../../lib/probe');
+const { isLocalNetError } = require('../../lib/netif');
 
 const RATE_LIMIT_MIN = 30;
 const round1 = (v) => (v == null ? null : Math.round(v * 10) / 10);
@@ -303,7 +304,7 @@ module.exports = class DecoDevice extends Homey.Device {
       await this._set('netmon_latency', round1(r.latency));
       await this._set('netmon_jitter', round1(r.jitter));
       if (r.latency == null) {
-        this._diagOnce('lat_none', RATE_LIMIT_MIN, 'warn', 'deco', this._t('diag.deco_no_rtt', { ip: node.ip, error: r.error || '?' }));
+        this._diagOnce('lat_none', RATE_LIMIT_MIN, 'warn', 'deco', this._t('diag.deco_no_rtt', { ip: node.ip, error: r.error || '?' }) + (isLocalNetError(r.error) ? ` ${this._t('diag.homey_net_hint')}` : ''));
         return;
       }
       const max = Number(this.getSetting('max_latency')) || 0;

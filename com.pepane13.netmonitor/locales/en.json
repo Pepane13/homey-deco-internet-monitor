@@ -127,7 +127,11 @@
     "deco_rtt_high": "High latency to this node: {ms} ms (threshold {limit} ms, backhaul {backhaul})",
     "deco_rtt_loss": "Loss to this node: {loss} % of the measurements unanswered",
     "local_round": "(delayed locally: box answered in {lan} ms, latency and jitter not evaluated)",
-    "thresholds_migrated": "Alert thresholds updated to the new defaults: {values}"
+    "thresholds_migrated": "Alert thresholds updated to the new defaults: {values}",
+    "down_homey": "Internet down since {since}: Homey lost its own network connection ({error}: no local route). The box and the rest of the network are not involved; check Homey's cable, Ethernet adapter and power supply, and the switch port. Homey interfaces: {ifaces}",
+    "homey_link_lost": "Homey has no usable network connection ({error}). Interfaces: {ifaces}",
+    "homey_link_back": "Homey network connection back. Interfaces: {ifaces}",
+    "homey_net_hint": "(Homey itself has no network connection)"
   },
   "settings": {
     "title": "Deco & Internet Monitor – Diagnostics",

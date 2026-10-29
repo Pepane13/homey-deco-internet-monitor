@@ -22,7 +22,7 @@ const probe = require(`${APP}/lib/probe`);
 const speed = require(`${APP}/lib/speedtest`);
 const stub = { online: true, latency: 6, jitter: 1, loss: 0, gateway: true, speed: { download: 93.4, upload: 91.8, latency: 5.2, jitter: 0.4, server: 'MRS', bytes: 2e8 } };
 probe.probeRound = async () => ({ online: stub.online, latency: stub.online ? stub.latency : null, jitter: stub.online ? stub.jitter : null, loss: stub.online ? stub.loss : 100, reachable: stub.online ? 3 : 0, total: 3, perTarget: [] });
-probe.tcpConnectTime = async () => { if (!stub.gateway) throw new Error('down'); return stub.gwMs ?? 0.8; };
+probe.tcpConnectTime = async () => { if (!stub.gateway) throw Object.assign(new Error(stub.gwCode ? `connect ${stub.gwCode}` : 'down'), { code: stub.gwCode || 'ETIMEDOUT' }); return stub.gwMs ?? 0.8; };
 probe.rttSeries = async () => ({ ...stub.rtt });
 stub.rtt = { latency: 3.2, jitter: 0.5, loss: 0, max: 4.1, error: null };
 probe.dnsTime = async () => 12;
@@ -137,6 +137,38 @@ const clear = () => trig.splice(0);
     await inet.probe(); await inet.probe();
     assert.strictEqual(fired('internet_down')[0].tokens.cause, 'lan');
     stub.online = true; stub.gateway = true;
+    await inet.probe();
+    clear();
+  });
+
+  await test('outage with ENETUNREACH towards the box is reported as Homey losing its own link', async () => {
+    homey.notes.length = 0;
+    const os = require('os');
+    const realIf = os.networkInterfaces;
+    os.networkInterfaces = () => ({ lo: [{ address: '127.0.0.1', family: 'IPv4', internal: true }], eth0: [{ address: 'fe80::1', family: 'IPv6', internal: false }] });
+    stub.online = false; stub.gateway = false; stub.gwCode = 'ENETUNREACH';
+    await inet.probe(); await inet.probe();
+    assert.strictEqual(fired('internet_down')[0].tokens.cause, 'homey');
+    const down = logged(/^Internet down since/, 'error').pop();
+    assert.ok(/Homey lost its own network connection \(ENETUNREACH/.test(down.m), down.m);
+    assert.ok(/interfaces: eth0 —/.test(down.m), down.m);
+    assert.ok(!/\{\w+\}/.test(down.m), `unresolved token in: ${down.m}`);
+    assert.ok(homey.notes.some((n) => /Homey lost its own network connection/.test(n)), 'notified');
+    os.networkInterfaces = () => ({ eth0: [{ address: '192.168.1.52', cidr: '192.168.1.52/24', family: 'IPv4', internal: false }] });
+    stub.online = true; stub.gateway = true; stub.gwCode = null;
+    await inet.probe();
+    assert.ok(logged(/^Homey network connection back\. Interfaces: eth0 192\.168\.1\.52\/24/, 'info').length >= 1);
+    os.networkInterfaces = realIf;
+    clear();
+  });
+
+  await test('box timing out (not a local socket error) stays a LAN problem, with tokens resolved', async () => {
+    stub.online = false; stub.gateway = false; stub.gwCode = 'ETIMEDOUT';
+    await inet.probe(); await inet.probe();
+    assert.strictEqual(fired('internet_down')[0].tokens.cause, 'lan');
+    const down = logged(/^Internet down since/, 'error').pop();
+    assert.ok(!/\{\w+\}/.test(down.m), `unresolved token in: ${down.m}`);
+    stub.online = true; stub.gateway = true; stub.gwCode = null;
     await inet.probe();
     clear();
   });

@@ -1,6 +1,6 @@
 {
   "id": "com.pepane13.netmonitor",
-  "version": "1.1.1",
+  "version": "1.1.2",
   "compatibility": ">=12.2.0",
   "sdk": 3,
   "platforms": [
@@ -1507,8 +1507,8 @@
             "name": "cause",
             "type": "string",
             "title": {
-              "en": "Cause (internet / lan)",
-              "fr": "Cause (internet / lan)"
+              "en": "Cause (internet / lan / homey)",
+              "fr": "Cause (internet / lan / homey)"
             },
             "example": "internet"
           }

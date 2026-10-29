@@ -297,7 +297,7 @@ const tok = (name, type, title, example) => ({ name, type, title, example });
 const flow = {
   triggers: [
     { id: 'internet_down', title: t('Internet went down', 'Internet est coupé'), hint: t('After the confirmation rounds set in the device.', 'Après le nombre de confirmations réglé dans l\'appareil.'),
-      tokens: [tok('since', 'string', t('Since', 'Depuis'), '14:32'), tok('cause', 'string', t('Cause (internet / lan)', 'Cause (internet / lan)'), 'internet')], args: [dev('internet')] },
+      tokens: [tok('since', 'string', t('Since', 'Depuis'), '14:32'), tok('cause', 'string', t('Cause (internet / lan / homey)', 'Cause (internet / lan / homey)'), 'internet')], args: [dev('internet')] },
     { id: 'internet_restored', title: t('Internet is back', 'Internet est rétabli'),
       tokens: [tok('duration', 'number', t('Outage duration (s)', 'Durée de coupure (s)'), 95), tok('duration_text', 'string', t('Outage duration', 'Durée de coupure'), '1 min 35 s'), tok('since', 'string', t('Down since', 'Coupé depuis'), '14:32')],
       args: [dev('internet')] },

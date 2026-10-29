@@ -127,7 +127,11 @@
     "deco_rtt_high": "Latence élevée vers ce module : {ms} ms (seuil {limit} ms, liaison {backhaul})",
     "deco_rtt_loss": "Pertes vers ce module : {loss} % des mesures sans réponse",
     "local_round": "(retard local : la box a répondu en {lan} ms, latence et gigue non évaluées)",
-    "thresholds_migrated": "Seuils d'alerte mis à jour vers les nouvelles valeurs par défaut : {values}"
+    "thresholds_migrated": "Seuils d'alerte mis à jour vers les nouvelles valeurs par défaut : {values}",
+    "down_homey": "Internet coupé depuis {since} : la Homey a perdu sa propre connexion au réseau ({error} : aucune route locale). La box et le reste du réseau ne sont pas en cause ; vérifier le câble, l'adaptateur Ethernet et l'alimentation de la Homey, ainsi que le port du switch. Interfaces de la Homey : {ifaces}",
+    "homey_link_lost": "La Homey n'a plus de connexion réseau utilisable ({error}). Interfaces : {ifaces}",
+    "homey_link_back": "Connexion réseau de la Homey rétablie. Interfaces : {ifaces}",
+    "homey_net_hint": "(la Homey elle-même n'a plus de réseau)"
   },
   "settings": {
     "title": "Deco & Internet Monitor – Diagnostic",

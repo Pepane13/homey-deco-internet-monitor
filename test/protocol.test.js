@@ -255,6 +255,21 @@ async function test(name, fn) {
     assert.strictEqual(r.server, 'MRS');
   });
 
+  await test('netif: local socket errors and interface snapshot', async () => {
+    const { isLocalNetError, interfaceSnapshot } = require('../com.pepane13.netmonitor/lib/netif');
+    assert.strictEqual(isLocalNetError('ENETUNREACH'), true);
+    assert.strictEqual(isLocalNetError('ENETDOWN'), true);
+    assert.strictEqual(isLocalNetError('ETIMEDOUT'), false);
+    assert.strictEqual(isLocalNetError('EHOSTUNREACH'), false);
+    assert.strictEqual(isLocalNetError(null), false);
+    const up = interfaceSnapshot(() => ({ lo: [{ address: '127.0.0.1', family: 'IPv4', internal: true }], eth0: [{ address: '192.168.1.52', cidr: '192.168.1.52/24', family: 'IPv4', internal: false }] }));
+    assert.deepStrictEqual([up.text, up.hasIPv4], ['eth0 192.168.1.52/24', true]);
+    const lost = interfaceSnapshot(() => ({ eth0: [{ address: 'fe80::1', family: 'IPv6', internal: false }] }));
+    assert.deepStrictEqual([lost.text, lost.hasIPv4], ['eth0 —', false]);
+    assert.deepStrictEqual(interfaceSnapshot(() => ({})).hasIPv4, false);
+    assert.strictEqual(interfaceSnapshot(() => { throw new Error('boom'); }).hasIPv4, true, 'unknown state never claims a lost link');
+  });
+
   console.log(`\n${passed} passed${process.exitCode ? ', some FAILED' : ''}`);
   setTimeout(() => process.exit(process.exitCode || 0), 100);
 })();

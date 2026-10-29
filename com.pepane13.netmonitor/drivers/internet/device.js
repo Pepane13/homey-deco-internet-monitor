@@ -5,6 +5,7 @@ const { probeRound, parseTargets, tcpConnectTime, dnsTime } = require('../../lib
 const { runSpeedtest } = require('../../lib/speedtest');
 const { OutageTracker, ThresholdWatch } = require('../../lib/monitor');
 const { DayStats, dayKey, timeOf } = require('../../lib/quality');
+const { isLocalNetError, interfaceSnapshot } = require('../../lib/netif');
 
 const LOCAL_DELAY_MIN_MS = 20;
 const RATE_LIMIT_MIN = 30; // same warning at most once per 30 min
@@ -255,7 +256,10 @@ module.exports = class InternetDevice extends Homey.Device {
     if (r.online && r.reachable < r.total) {
       this._diagOnce('partial', RATE_LIMIT_MIN, 'info', 'internet', this._t('diag.partial', { ok: r.reachable, total: r.total, targets: per }));
     }
-    if (gatewayOk === false) {
+    const homeyLink = this._checkHomeyLink(gatewayOk);
+    if (homeyLink) {
+      this._diagOnce('homey_link', RATE_LIMIT_MIN, 'warn', 'internet', this._t('diag.homey_link_lost', { error: this.lastLanError || '—', ifaces: this.linkSnapshot.ifaces }));
+    } else if (gatewayOk === false) {
       this._diagOnce('lan_down', RATE_LIMIT_MIN, 'warn', 'internet', this._t('diag.lan_unreachable', { target: gwSetting }));
     }
     if (this.rounds % 10 === 0) await this.setStoreValue('day_stats', this.stats.toJSON());
@@ -267,9 +271,15 @@ module.exports = class InternetDevice extends Homey.Device {
 
     const ev = this.tracker.update(r.online, Date.now());
     if (ev && ev.type === 'down') {
-      const cause = gatewayOk === false ? 'lan' : 'internet';
-      this.log(`Internet down since ${new Date(ev.since).toISOString()} (cause: ${cause})`, JSON.stringify(r.perTarget));
-      const msg = this.homey.__(cause === 'lan' ? 'diag.down_lan' : 'diag.down_internet', { since: this._time(ev.since), targets: per });
+      const cause = homeyLink ? 'homey' : (gatewayOk === false ? 'lan' : 'internet');
+      this.outageCause = cause;
+      this.log(`Internet down since ${new Date(ev.since).toISOString()} (cause: ${cause})`, JSON.stringify(r.perTarget), this.linkSnapshot ? JSON.stringify(this.linkSnapshot) : '');
+      const key = { homey: 'diag.down_homey', lan: 'diag.down_lan', internet: 'diag.down_internet' }[cause];
+      const msg = this._t(key, {
+        since: this._time(ev.since), targets: per || '—',
+        error: (this.linkSnapshot && this.linkSnapshot.error) || this.lastLanError || '—',
+        ifaces: this.linkSnapshot ? this.linkSnapshot.ifaces : interfaceSnapshot().text,
+      });
       this.lastError = { t: new Date(now).toISOString(), text: msg };
       this.stats.count('outages');
       this.stats.event(`down ${this._time(ev.since)}`);
@@ -281,6 +291,8 @@ module.exports = class InternetDevice extends Homey.Device {
       const msg = this._t('diag.restored', { duration: formatDuration(ev.duration), since: this._time(ev.since) });
       this.stats.count('downtime', ev.duration);
       this._diag('warn', 'internet', msg);
+      if (this.outageCause === 'homey') this._diag('info', 'internet', this._t('diag.homey_link_back', { ifaces: interfaceSnapshot().text }));
+      this.outageCause = null;
       await this._notify('notify_internet', msg);
       await this._trigger('internet_restored', { duration: ev.duration, duration_text: formatDuration(ev.duration), since: this._time(ev.since) });
     }
@@ -318,10 +330,28 @@ module.exports = class InternetDevice extends Homey.Device {
 
   async _lanTime(gw) {
     try {
-      return await tcpConnectTime(gw.host, gw.port, 2000);
+      const ms = await tcpConnectTime(gw.host, gw.port, 2000);
+      this.lastLanError = null;
+      return ms;
     } catch (e) {
+      this.lastLanError = e.code || e.message;
       return null;
     }
+  }
+
+  /**
+   * Homey lost its own network link when the box fails with a local socket error (ENETUNREACH...)
+   * or when no external interface has an IPv4 address any more. The interface state is captured
+   * at the first failing round, so the report shows what Homey saw when the link dropped.
+   */
+  _checkHomeyLink(gatewayOk) {
+    if (gatewayOk !== false) {
+      this.linkSnapshot = null;
+      return false;
+    }
+    const snap = interfaceSnapshot();
+    if (!this.linkSnapshot) this.linkSnapshot = { t: Date.now(), error: this.lastLanError, ifaces: snap.text, hasIPv4: snap.hasIPv4 };
+    return isLocalNetError(this.lastLanError) || !snap.hasIPv4;
   }
 
   /**

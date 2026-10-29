@@ -6,7 +6,7 @@ Homey Pro app (SDK 3) that monitors a home network locally, without any cloud se
 
 | Driver | Measurements (Insights) | Flow triggers |
 |---|---|---|
-| **Internet quality** | Status, connectivity, latency, jitter, packet loss, LAN latency to the box, DNS time, download / upload / latency (speed test), outages and downtime today | Internet down (cause: `internet` / `lan`), Internet back (duration), speed test finished / failed, quality degraded / back to normal |
+| **Internet quality** | Status, connectivity, latency, jitter, packet loss, LAN latency to the box, DNS time, download / upload / latency (speed test), outages and downtime today | Internet down (cause: `internet` / `lan` / `homey`), Internet back (duration), speed test finished / failed, quality degraded / back to normal |
 | **Internet box** (provider chosen before pairing) | Internet link quality score (%), Internet link, public IP, connection and box uptime, line state; real-time down / up traffic (Livebox, Bbox); Rx / Tx optical power (Livebox); native speed test results as their own curves: download / upload / latency (Livebox) | Fibre down / back, connection renewed, box rebooted, public IP changed, fibre signal low / back to normal |
 | **Deco node** (one per node) | Online, latency and jitter from Homey to the node (mesh backhaul included), clients on the node, client download / upload traffic and "Average traffic" tile indicator (rolling mean, window configurable); main Deco: clients total / 2.4 GHz / 5 GHz / wired, CPU, memory, Internet as seen by the Deco; wireless satellites: backhaul signal and speed | Node offline / online, backhaul weak / back to normal, device connected / disconnected |
 
