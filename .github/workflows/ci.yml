@@ -1,0 +1,30 @@
+name: Tests and validation
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Tests, manifest and Homey validation
+    runs-on: ubuntu-latest
+    env:
+      APP_DIR: com.pepane13.netmonitor
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: app.json is generated from tools/build-manifest.js
+        run: |
+          node tools/build-manifest.js
+          git diff --exit-code -- "$APP_DIR/app.json" || { echo "::error::app.json is out of date: run node tools/build-manifest.js and commit"; exit 1; }
+      - name: Tests
+        run: for t in test/*.test.js; do echo "== $t"; node "$t" || exit 1; done
+      - name: Homey validation (publish level)
+        working-directory: ${{ env.APP_DIR }}
+        run: npx --yes homey@4 app validate --level publish

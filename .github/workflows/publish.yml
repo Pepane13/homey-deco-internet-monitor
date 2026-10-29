@@ -1,0 +1,53 @@
+name: Publish to the Homey App Store
+# Push a tag vX.Y.Z matching package.json to publish that version.
+# Requires the repository secret HOMEY_PAT (personal access token from https://tools.developer.homey.app/me).
+on:
+  push:
+    tags: ['v*.*.*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: homey-publish
+  cancel-in-progress: false
+
+jobs:
+  checks:
+    uses: ./.github/workflows/ci.yml
+
+  publish:
+    name: Publish
+    needs: checks
+    runs-on: ubuntu-latest
+    env:
+      APP_DIR: com.pepane13.netmonitor
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Tag, version and changelog are consistent
+        run: |
+          VERSION=$(node -p "require('./$APP_DIR/package.json').version")
+          if [ "${GITHUB_REF_TYPE}" = "tag" ] && [ "${GITHUB_REF_NAME}" != "v${VERSION}" ]; then
+            echo "::error::Tag ${GITHUB_REF_NAME} does not match package.json version ${VERSION}"; exit 1
+          fi
+          node -e "const c=require('./$APP_DIR/.homeychangelog.json')['$VERSION']; if(!c||!c.en||!c.fr){console.error('::error::Missing en/fr changelog for $VERSION');process.exit(1)}"
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+      - name: Token present
+        env:
+          HOMEY_PAT: ${{ secrets.HOMEY_PAT }}
+        run: |
+          [ -n "$HOMEY_PAT" ] || { echo "::error::Repository secret HOMEY_PAT is missing (Settings > Secrets and variables > Actions). Token: https://tools.developer.homey.app/me"; exit 1; }
+      - name: Publish v${{ env.VERSION }}
+        working-directory: ${{ env.APP_DIR }}
+        env:
+          HOMEY_HEADLESS: '1'
+          HOMEY_PAT: ${{ secrets.HOMEY_PAT }}
+        run: npx --yes homey@4 app publish
+      - name: Summary
+        run: |
+          ID=$(node -p "require('./$APP_DIR/app.json').id")
+          echo "Published v${VERSION}. Submit it for certification or promote it at https://tools.developer.homey.app/apps/app/${ID}" >> "$GITHUB_STEP_SUMMARY"
