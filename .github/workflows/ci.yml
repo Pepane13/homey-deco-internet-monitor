@@ -1,7 +1,5 @@
 name: Tests and validation
 on:
-  push:
-    branches: [main]
   pull_request:
   workflow_call:
 
